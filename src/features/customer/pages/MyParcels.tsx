@@ -1,72 +1,252 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Search, Package, FileText, Download } from 'lucide-react';
-import DashboardLayout from '../../../components/layout/DashboardLayout';
-import { StatusBadge, EmptyState, Modal, StatusTimeline } from '../../../components/shared/SharedComponents';
-import { MOCK_PARCELS } from '../../../lib/mockData';
-import type { Parcel } from '../../../types/global.types';
+import React, { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { Search, Package, FileText, Download } from "lucide-react";
 
-const STATUS_FILTERS: { label: string; value: string }[] = [
-  { label: 'All', value: 'all' },
-  { label: 'Pending', value: 'pending' },
-  { label: 'In Progress', value: 'in_progress' },
-  { label: 'Delivered', value: 'delivered' },
-  { label: 'Cancelled', value: 'cancelled' },
+import DashboardLayout from "../../../components/layout/DashboardLayout";
+import {
+  StatusBadge,
+  EmptyState,
+  Modal,
+  StatusTimeline,
+} from "../../../components/shared/SharedComponents";
+
+import { useAuth } from "../../auth/context/AuthContext";
+import { useParcels } from "../services/parcel-store";
+import { downloadReceipt } from "../services/receipt";
+
+import type { Parcel } from "../../../types/global.types";
+import "../customer.css";
+
+const STATUS_FILTERS = [
+  { label: "All", value: "all" },
+  { label: "Pending", value: "pending" },
+  { label: "In Progress", value: "in_progress" },
+  { label: "Delivered", value: "delivered" },
+  { label: "Cancelled", value: "cancelled" },
+  { label: "Failed", value: "failed" },
+  { label: "Returned", value: "returned" },
 ];
 
 const MyParcels: React.FC = () => {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedParcel, setSelectedParcel] = useState<Parcel | null>(null);
-  const [showReceipt, setShowReceipt] = useState<Parcel | null>(null);
+  const { user } = useAuth();
+  const location = useLocation();
 
-  const myParcels = MOCK_PARCELS.filter(p => p.senderId === 'usr_001');
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [sort, setSort] = useState("newest");
+  const [page, setPage] = useState(1);
 
-  const filtered = myParcels.filter(p => {
-    const matchSearch = !search ||
-      p.trackingNumber.toLowerCase().includes(search.toLowerCase()) ||
-      p.recipientName.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'all' ||
-      (statusFilter === 'in_progress' && ['assigned', 'picked_up', 'in_transit', 'out_for_delivery'].includes(p.status)) ||
-      p.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  const [selectedParcel, setSelectedParcel] =
+    useState<Parcel | null>(null);
+
+  const [showReceipt, setShowReceipt] =
+    useState<Parcel | null>(null);
+
+  const [receiptError, setReceiptError] = useState("");
+
+  const myParcels = useParcels().filter(
+    (parcel) => parcel.senderId === user?.id,
+  );
+
+  const filtered = myParcels
+    .filter((parcel) => {
+      const query = search.toLowerCase();
+
+      const matchSearch =
+        !search ||
+        parcel.trackingNumber.toLowerCase().includes(query) ||
+        parcel.recipientName.toLowerCase().includes(query);
+
+      const matchStatus =
+        statusFilter === "all" ||
+        (statusFilter === "in_progress" &&
+          [
+            "assigned",
+            "picked_up",
+            "in_transit",
+            "out_for_delivery",
+          ].includes(parcel.status)) ||
+        parcel.status === statusFilter;
+
+      const date = parcel.createdAt.slice(0, 10);
+
+      return (
+        matchSearch &&
+        matchStatus &&
+        (!fromDate || date >= fromDate) &&
+        (!toDate || date <= toDate)
+      );
+    })
+    .sort((a, b) =>
+      sort === "oldest"
+        ? Date.parse(a.createdAt) - Date.parse(b.createdAt)
+        : Date.parse(b.createdAt) - Date.parse(a.createdAt),
+    );
+
+  const pages = Math.max(1, Math.ceil(filtered.length / 5));
+  const currentPage = Math.min(page, pages);
+
+  const visible = filtered.slice(
+    (currentPage - 1) * 5,
+    currentPage * 5,
+  );
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("all");
+    setFromDate("");
+    setToDate("");
+    setSort("newest");
+    setPage(1);
+  }
+
+  async function handleReceiptDownload() {
+    if (!showReceipt) return;
+
+    try {
+      setReceiptError("");
+      await downloadReceipt(showReceipt);
+    } catch {
+      setReceiptError(
+        "Unable to download receipt. Please try again.",
+      );
+    }
+  }
 
   return (
     <DashboardLayout>
       <div className="page-header">
         <h1 className="page-title">My Parcels</h1>
-        <p className="page-subtitle">All your bookings and shipments</p>
+        <p className="page-subtitle">
+          All your bookings and shipments
+        </p>
+
+        {location.state?.bookedTracking && (
+          <p role="status" className="customer-success">
+            Booking confirmed:{" "}
+            <strong>{location.state.bookedTracking}</strong>.
+            Your parcel is awaiting assignment.
+          </p>
+        )}
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-        <div className="tabs">
-          {STATUS_FILTERS.map(f => (
-            <button key={f.value} className={`tab-btn ${statusFilter === f.value ? 'active' : ''}`}
-              onClick={() => setStatusFilter(f.value)}>
-              {f.label}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 16,
+          flexWrap: "wrap",
+          gap: 12,
+        }}
+      >
+        <div
+          className="tabs customer-status-tabs"
+          role="group"
+          aria-label="Filter by status"
+        >
+          {STATUS_FILTERS.map((filter) => (
+            <button
+              key={filter.value}
+              className={`tab-btn ${
+                statusFilter === filter.value ? "active" : ""
+              }`}
+              aria-pressed={statusFilter === filter.value}
+              onClick={() => {
+                setStatusFilter(filter.value);
+                setPage(1);
+              }}
+            >
+              {filter.label}
             </button>
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div className="customer-history-search">
           <div className="search-input-wrapper">
             <Search size={16} />
-            <input placeholder="Search by tracking #, recipient..."
-              value={search} onChange={e => setSearch(e.target.value)} />
+            <input
+              aria-label="Search bookings"
+              placeholder="Search by tracking #, recipient..."
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+            />
           </div>
-          <Link to="/customer/book" className="btn btn-primary btn-sm">
-            <Package size={14} /> New Booking
+
+          <Link
+            to="/customer/book"
+            className="btn btn-primary btn-sm"
+          >
+            <Package size={14} />
+            New Booking
           </Link>
         </div>
       </div>
 
-      {/* Table */}
+      <div className="customer-history-tools">
+        <label>
+          From date
+          <input
+            type="date"
+            className="form-input"
+            value={fromDate}
+            max={toDate || undefined}
+            onChange={(event) => {
+              setFromDate(event.target.value);
+              setPage(1);
+            }}
+          />
+        </label>
+
+        <label>
+          To date
+          <input
+            type="date"
+            className="form-input"
+            value={toDate}
+            min={fromDate || undefined}
+            onChange={(event) => {
+              setToDate(event.target.value);
+              setPage(1);
+            }}
+          />
+        </label>
+
+        <label>
+          Sort by
+          <select
+            className="form-input"
+            value={sort}
+            onChange={(event) => {
+              setSort(event.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </select>
+        </label>
+
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={clearFilters}
+        >
+          Clear filters
+        </button>
+      </div>
+
       <div className="card">
         <div className="table-wrapper">
           {filtered.length === 0 ? (
-            <EmptyState title="No parcels found" description="Try adjusting your search or filters." />
+            <EmptyState
+              title="No parcels found"
+              description="Try adjusting your search or filters."
+            />
           ) : (
             <table className="table">
               <thead>
@@ -81,36 +261,85 @@ const MyParcels: React.FC = () => {
                   <th>Actions</th>
                 </tr>
               </thead>
+
               <tbody>
-                {filtered.map((p, i) => (
-                  <tr key={p.id} className="animate-fade-in" style={{ animationDelay: `${i * 40}ms` }}>
+                {visible.map((parcel) => (
+                  <tr key={parcel.id}>
                     <td>
-                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--primary-light)' }}>
-                        {p.trackingNumber}
+                      <strong
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 12,
+                          color: "var(--primary-light)",
+                        }}
+                      >
+                        {parcel.trackingNumber}
                       </strong>
                     </td>
+
                     <td>
-                      <div>
-                        <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.recipientName}</p>
-                        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.recipientPhone}</p>
-                      </div>
+                      <p style={{ fontWeight: 600 }}>
+                        {parcel.recipientName}
+                      </p>
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "var(--text-muted)",
+                        }}
+                      >
+                        {parcel.recipientPhone}
+                      </p>
                     </td>
-                    <td>{p.recipientAddress.city}, {p.recipientAddress.district}</td>
-                    <td>{p.size.toUpperCase()} · {p.weight}kg</td>
-                    <td><StatusBadge status={p.status} /></td>
-                    <td style={{ color: 'var(--success)', fontWeight: 600 }}>Rs. {p.totalFee.toLocaleString()}</td>
-                    <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                      {new Date(p.createdAt).toLocaleDateString('en-LK')}
-                    </td>
+
                     <td>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button className="btn btn-ghost btn-sm"
-                          onClick={() => setSelectedParcel(p)}>
+                      {parcel.recipientAddress.city},{" "}
+                      {parcel.recipientAddress.district}
+                    </td>
+
+                    <td>
+                      {parcel.size.toUpperCase()} ·{" "}
+                      {parcel.weight}kg
+                    </td>
+
+                    <td>
+                      <StatusBadge status={parcel.status} />
+                    </td>
+
+                    <td
+                      style={{
+                        color: "var(--success)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Rs. {parcel.totalFee.toLocaleString()}
+                    </td>
+
+                    <td>
+                      {new Date(
+                        parcel.createdAt,
+                      ).toLocaleDateString("en-LK")}
+                    </td>
+
+                    <td>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() =>
+                            setSelectedParcel(parcel)
+                          }
+                        >
                           Track
                         </button>
-                        {p.status === 'delivered' && (
-                          <button className="btn btn-ghost btn-sm"
-                            onClick={() => setShowReceipt(p)}>
+
+                        {parcel.status === "delivered" && (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            aria-label={`View receipt for ${parcel.trackingNumber}`}
+                            onClick={() => {
+                              setReceiptError("");
+                              setShowReceipt(parcel);
+                            }}
+                          >
                             <FileText size={12} />
                           </button>
                         )}
@@ -124,54 +353,138 @@ const MyParcels: React.FC = () => {
         </div>
       </div>
 
-      {/* Tracking Modal */}
+      <nav
+        className="customer-pagination"
+        aria-label="Booking history pages"
+      >
+        <span role="status">
+          {filtered.length} bookings · Page {currentPage} of{" "}
+          {pages}
+        </span>
+
+        <div>
+          <button
+            className="btn btn-secondary btn-sm"
+            disabled={currentPage === 1}
+            onClick={() => setPage(currentPage - 1)}
+          >
+            Previous
+          </button>{" "}
+
+          <button
+            className="btn btn-secondary btn-sm"
+            disabled={currentPage === pages}
+            onClick={() => setPage(currentPage + 1)}
+          >
+            Next
+          </button>
+        </div>
+      </nav>
+
       <Modal
         isOpen={!!selectedParcel}
         onClose={() => setSelectedParcel(null)}
-        title={`Tracking: ${selectedParcel?.trackingNumber}`}
+        title={`Tracking: ${
+          selectedParcel?.trackingNumber ?? ""
+        }`}
         size="lg"
       >
         {selectedParcel && (
-          <StatusTimeline
-            history={selectedParcel.statusHistory}
-            currentStatus={selectedParcel.status}
-          />
+          <>
+            <div className="customer-note">
+              <strong>{selectedParcel.description}</strong>
+
+              <p>
+                Pickup: {selectedParcel.pickupAddress.street},{" "}
+                {selectedParcel.pickupAddress.city}
+              </p>
+
+              <p>
+                Delivery:{" "}
+                {selectedParcel.recipientAddress.street},{" "}
+                {selectedParcel.recipientAddress.city}
+              </p>
+
+              <p>
+                Estimated delivery:{" "}
+                {selectedParcel.estimatedDeliveryDate ??
+                  "Awaiting estimate"}
+              </p>
+            </div>
+
+            <StatusTimeline
+              history={selectedParcel.statusHistory}
+              currentStatus={selectedParcel.status}
+            />
+          </>
         )}
       </Modal>
 
-      {/* Receipt Modal */}
       <Modal
         isOpen={!!showReceipt}
         onClose={() => setShowReceipt(null)}
         title="Delivery Receipt"
         footer={
-          <button className="btn btn-primary btn-sm" onClick={() => setShowReceipt(null)}>
-            <Download size={14} /> Download PDF
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={handleReceiptDownload}
+          >
+            <Download size={14} />
+            Download PDF
           </button>
         }
       >
         {showReceipt && (
           <div className="receipt">
+            {receiptError && (
+              <p role="alert" className="customer-error">
+                {receiptError}
+              </p>
+            )}
+
             <div className="receipt-header">
-              <p style={{ fontSize: 13, opacity: 0.8, marginBottom: 4 }}>SwiftDrop — Delivery Receipt</p>
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 800 }}>{showReceipt.trackingNumber}</p>
-              <p style={{ fontSize: 13, marginTop: 4, opacity: 0.9 }}>Delivered Successfully</p>
+              <p>SwiftDrop — Delivery Receipt</p>
+              <strong>{showReceipt.trackingNumber}</strong>
+              <p>Delivered Successfully</p>
             </div>
+
             <div className="receipt-body">
               {[
-                ['Recipient', showReceipt.recipientName],
-                ['Phone', showReceipt.recipientPhone],
-                ['Address', `${showReceipt.recipientAddress.street}, ${showReceipt.recipientAddress.city}`],
-                ['Package', showReceipt.description],
-                ['Weight', `${showReceipt.weight} kg`],
-                ['Courier', showReceipt.courierName ?? '—'],
-                ['Delivered', showReceipt.deliveredAt ? new Date(showReceipt.deliveredAt).toLocaleString('en-LK') : '—'],
-                ['Payment', showReceipt.paymentMethod === 'cod' ? 'Cash on Delivery' : 'Online'],
-                ['Delivery Fee', `Rs. ${showReceipt.totalFee.toLocaleString()}`],
+                ["Recipient", showReceipt.recipientName],
+                ["Phone", showReceipt.recipientPhone],
+                [
+                  "Address",
+                  `${showReceipt.recipientAddress.street}, ${showReceipt.recipientAddress.city}`,
+                ],
+                ["Package", showReceipt.description],
+                ["Weight", `${showReceipt.weight} kg`],
+                ["Courier", showReceipt.courierName ?? "—"],
+                [
+                  "Delivered",
+                  showReceipt.deliveredAt
+                    ? new Date(
+                        showReceipt.deliveredAt,
+                      ).toLocaleString("en-LK")
+                    : "—",
+                ],
+                [
+                  "Payment",
+                  showReceipt.paymentMethod === "cod"
+                    ? "Cash on Delivery"
+                    : "Online",
+                ],
+                [
+                  "Delivery Fee",
+                  `Rs. ${showReceipt.totalFee.toLocaleString()}`,
+                ],
               ].map(([label, value]) => (
                 <div key={label} className="receipt-row">
-                  <span className="receipt-row-label">{label}</span>
-                  <span className="receipt-row-value">{value}</span>
+                  <span className="receipt-row-label">
+                    {label}
+                  </span>
+                  <span className="receipt-row-value">
+                    {value}
+                  </span>
                 </div>
               ))}
             </div>
