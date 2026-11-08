@@ -92,6 +92,11 @@ export interface Parcel {
 
   // Status history
   statusHistory: StatusEvent[];
+
+  // Customer feedback (Priority C - M2 enhancement)
+  rating?: number;
+  feedbackComment?: string;
+  feedbackSubmittedAt?: string;
 }
 
 export interface StatusEvent {

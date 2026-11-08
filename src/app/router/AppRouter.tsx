@@ -4,6 +4,8 @@ import { useAuth } from '../../features/auth/context/AuthContext';
 
 // Public
 import LandingPage from '../../components/shared/LandingPage';
+import AboutPage from '../../components/shared/AboutPage';
+import ContactPage from '../../components/shared/ContactPage';
 import PublicTracking from '../../features/tracking/pages/PublicTracking';
 
 // Auth
@@ -51,6 +53,8 @@ export const AppRouter: React.FC = () => {
       <Routes>
         {/* Public */}
         <Route path="/" element={<RootRedirect />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/contact" element={<ContactPage />} />
         <Route path="/track" element={<PublicTracking />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />

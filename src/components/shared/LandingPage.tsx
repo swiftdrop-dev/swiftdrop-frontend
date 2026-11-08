@@ -1,178 +1,182 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import heroCourierImg from '../../assets/hero-courier.jpg';
 import {
-  Package, Zap, MapPin, Shield, Clock, BarChart2,
-  Star, ArrowRight, CheckCircle, Truck, Store, Users, Activity,
-  ShoppingBag, Bike, SlidersHorizontal, Sparkles, Phone,
+  Package, Zap, MapPin, Shield, BarChart2,
+  ArrowRight, CheckCircle, Truck, Store, Users, Activity,
+  ShoppingBag, Bike, SlidersHorizontal, Sparkles, Home,
 } from 'lucide-react';
 
 const ROLES = [
-  { icon: <ShoppingBag size={24} />, role: 'Customer', path: '/login',
-    desc: 'Book parcels, track in real-time, and receive proof of delivery.',
-    c: '#0d9488', g: 'linear-gradient(135deg,#2dd4bf,#0d9488)' },
-  { icon: <Store size={24} />, role: 'Merchant', path: '/login',
-    desc: 'Bulk shipping, business analytics, and priority support for your orders.',
-    c: '#0284c7', g: 'linear-gradient(135deg,#38bdf8,#0284c7)' },
-  { icon: <Bike size={24} />, role: 'Courier', path: '/login',
-    desc: 'View your delivery queue, update statuses, and upload proof of delivery.',
-    c: '#ea580c', g: 'linear-gradient(135deg,#fb923c,#ea580c)' },
-  { icon: <SlidersHorizontal size={24} />, role: 'Dispatcher', path: '/login',
-    desc: 'Assign routes, manage the fleet, and generate business reports.',
-    c: '#7c3aed', g: 'linear-gradient(135deg,#a78bfa,#7c3aed)' },
+  {
+    icon: <ShoppingBag size={22} />,
+    role: 'Customer',
+    path: '/login',
+    tag: 'Personal & Gifts',
+    image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=600&q=80',
+    desc: 'Book parcels in seconds, track in real-time, and get digital proof of delivery.',
+    c: '#0d9488',
+    g: 'linear-gradient(135deg,#2dd4bf,#0d9488)',
+  },
+  {
+    icon: <Store size={22} />,
+    role: 'Merchant',
+    path: '/login',
+    tag: 'E-commerce & Retail',
+    image: 'https://images.unsplash.com/photo-1556740738-b6a63e27c4df?auto=format&fit=crop&w=600&q=80',
+    desc: 'Bulk shipping, merchant APIs, webhooks, and cash-on-delivery management.',
+    c: '#0284c7',
+    g: 'linear-gradient(135deg,#38bdf8,#0284c7)',
+  },
+  {
+    icon: <Bike size={22} />,
+    role: 'Courier',
+    path: '/login',
+    tag: 'Riders & Drivers',
+    image: 'https://images.unsplash.com/photo-1616401784845-180882ba9ba8?auto=format&fit=crop&w=600&q=80',
+    desc: 'View your delivery queue, update statuses, upload photo proof, and enter OTP.',
+    c: '#ea580c',
+    g: 'linear-gradient(135deg,#fb923c,#ea580c)',
+  },
+  {
+    icon: <SlidersHorizontal size={22} />,
+    role: 'Dispatcher',
+    path: '/login',
+    tag: 'Hub Operations',
+    image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=600&q=80',
+    desc: 'Assign routes, balance courier workloads, and generate analytical business reports.',
+    c: '#7c3aed',
+    g: 'linear-gradient(135deg,#a78bfa,#7c3aed)',
+  },
 ];
 
 const FEATURES = [
-  { icon: <MapPin size={22} />, title: 'Real-Time Tracking', cls: 'wide',
-    desc: 'Know exactly where your parcel is at every step of the journey with live status updates.' },
-  { icon: <Zap size={22} />, title: 'Instant Fee Estimates', cls: '',
-    desc: 'Get accurate delivery cost estimates based on weight, size, distance, and package type.' },
-  { icon: <Shield size={22} />, title: 'Proof of Delivery', cls: '',
-    desc: 'Couriers upload photos and capture digital signatures to confirm successful deliveries.' },
-  { icon: <Activity size={22} />, title: 'Live Dashboard', cls: 'dark',
-    desc: 'Role-based dashboards give every user exactly the data they need, no more, no less.' },
-  { icon: <BarChart2 size={22} />, title: 'Business Reports', cls: '',
-    desc: 'Dispatchers access detailed delivery reports, revenue analytics, and courier performance.' },
-  { icon: <Truck size={22} />, title: 'Smart Assignment', cls: 'wide',
-    desc: 'Dispatchers assign or auto-assign parcels to the nearest available courier instantly.' },
+  {
+    icon: <MapPin size={22} />, title: 'Real-Time Tracking', cls: 'wide',
+    desc: 'Know exactly where your parcel is at every step of the journey with live status updates.'
+  },
+  {
+    icon: <Zap size={22} />, title: 'Instant Fee Estimates', cls: '',
+    desc: 'Get accurate delivery cost estimates based on weight, size, distance, and package type.'
+  },
+  {
+    icon: <Shield size={22} />, title: 'Proof of Delivery', cls: '',
+    desc: 'Couriers upload photos and capture digital signatures to confirm successful deliveries.'
+  },
+  {
+    icon: <Activity size={22} />, title: 'Live Dashboard', cls: 'dark',
+    desc: 'Role-based dashboards give every user exactly the data they need, no more, no less.'
+  },
+  {
+    icon: <BarChart2 size={22} />, title: 'Business Reports', cls: '',
+    desc: 'Dispatchers access detailed delivery reports, revenue analytics, and courier performance.'
+  },
+  {
+    icon: <Truck size={22} />, title: 'Smart Assignment', cls: 'wide',
+    desc: 'Dispatchers assign or auto-assign parcels to the nearest available courier instantly.'
+  },
 ];
 
 const LandingPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [quickTrack, setQuickTrack] = useState('');
+
+  const handleQuickTrack = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (quickTrack.trim()) {
+      navigate(`/track?q=${encodeURIComponent(quickTrack.trim())}`);
+    }
+  };
+
   return (
     <div className="landing">
       {/* Navbar */}
-      <nav className="landing-nav">
+      <nav className="landing-nav landing-nav-dark">
         <Link to="/" className="brand">
           <div className="brand-mark"><Package size={19} strokeWidth={2.25} /></div>
           <span className="brand-word">Swift<span>Drop</span></span>
         </Link>
 
         <div className="landing-nav-menu">
-          <a href="#roles">Solutions</a>
-          <a href="#features">Features</a>
-          <Link to="/track">Tracking</Link>
+          <Link to="/" className="nav-link-icon"><Home size={14} /> Home</Link>
+          <a href="#roles">Services</a>
+          <Link to="/track">Track Parcel</Link>
+          <Link to="/about">About</Link>
+          <Link to="/contact">Contact</Link>
         </div>
 
         <div className="landing-nav-links">
-          <Link to="/track" className="btn btn-ghost btn-sm hide-sm"><MapPin size={14} /> Track Parcel</Link>
-          <Link to="/login" className="btn btn-secondary btn-sm">Sign In</Link>
-          <Link to="/register" className="btn btn-primary btn-sm">Get Started</Link>
+          <Link to="/login" className="btn btn-nav-login btn-sm">Login</Link>
+          <Link to="/register" className="btn btn-nav-signup btn-sm">Sign Up</Link>
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="hero-section">
-        <div className="blobs">
-          <div className="blob b1" /><div className="blob b2" /><div className="blob b3" />
-          <div className="dot-grid" />
-        </div>
+      {/* ── DARK SPLIT HERO ── */}
+      <section className="hero-section hero-dark">
 
-        <div className="container hero-grid">
-          <div>
-            <div className="hero-eyebrow animate-fade-in">
-              <span className="pill"><Sparkles size={12} /> New</span>
-              Sri Lanka's fastest courier platform
+        <div className="hero-dark-container">
+
+          {/* LEFT — text + tracking bar */}
+          <div className="hero-dark-left">
+
+            <div className="hero-dark-eyebrow animate-fade-in">
+
+              <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13.5, fontWeight: 500 }}>
+                Sri Lanka's fastest courier platform
+              </span>
             </div>
 
-            <h1 className="hero-title animate-fade-in delay-1">
-              Deliver anything,{' '}
-              <span className="gradient-text">anywhere</span>{' '}
-              in Sri Lanka
+            <h1 className="hero-dark-title animate-fade-in delay-1">
+              Fast, Reliable &amp;{' '}
+              <span style={{ display: 'block' }}>
+                <span className="hero-dark-accent">Courier</span>{' '}Services
+              </span>
             </h1>
 
-            <p className="hero-subtitle animate-fade-in delay-2">
-              SwiftDrop connects customers, merchants, couriers, and dispatchers
-              on one powerful platform. Real-time tracking, instant booking, and
-              proof of delivery — all in one place.
+            <p className="hero-dark-sub animate-fade-in delay-2">
+              Ship anywhere in Sri Lanka and beyond.<br />
+              Real-time tracking, instant booking, proof of delivery.
             </p>
 
-            <div className="hero-actions animate-fade-in delay-3">
-              <Link to="/register" className="btn btn-primary btn-xl">
-                Start for Free <ArrowRight size={18} />
-              </Link>
-              <Link to="/track" className="btn btn-secondary btn-xl">
-                <MapPin size={18} /> Track a Parcel
-              </Link>
+            {/* Track bar */}
+            <div className="hero-dark-track-wrap animate-fade-in delay-3">
+              <div className="hero-dark-track-label">
+                <MapPin size={14} /> Track Your Shipment
+              </div>
+              <form onSubmit={handleQuickTrack} className="hero-dark-track-bar">
+                <Package size={18} className="hero-dark-track-icon" />
+                <input
+                  type="text"
+                  placeholder="Enter Tracking Number (e.g. SWF-2024-001234)"
+                  value={quickTrack}
+                  onChange={(e) => setQuickTrack(e.target.value)}
+                  className="hero-dark-track-input"
+                  aria-label="Tracking number"
+                />
+                <button type="submit" className="btn hero-dark-track-btn">
+                  Track Parcel <ArrowRight size={16} />
+                </button>
+              </form>
             </div>
 
-            <div className="hero-trust animate-fade-in delay-4">
-              <div className="avatars">
-                <span style={{ background: 'linear-gradient(135deg,#2dd4bf,#0d9488)' }}>AP</span>
-                <span style={{ background: 'linear-gradient(135deg,#38bdf8,#0284c7)' }}>NF</span>
-                <span style={{ background: 'linear-gradient(135deg,#fb923c,#ea580c)' }}>KS</span>
-                <span style={{ background: 'linear-gradient(135deg,#a78bfa,#7c3aed)' }}>+</span>
-              </div>
-              <div>
-                <div className="stars">{[...Array(5)].map((_, i) => <Star key={i} size={14} fill="currentColor" />)}</div>
-                <p><b>4.9 Rating</b> · 50,000+ deliveries</p>
-              </div>
+            {/* Trust badges */}
+            <div className="hero-dark-badges animate-fade-in delay-4">
+              <div><Zap size={16} /><span>Express Delivery</span></div>
+              <div><Shield size={16} /><span>Secure &amp; Trusted</span></div>
+              <div><MapPin size={16} /><span>Nationwide Coverage</span></div>
             </div>
+
           </div>
 
-          {/* Visual */}
-          <div className="hero-visual animate-fade-in delay-2">
-            <div className="float-chip c1">
-              <span className="ico" style={{ background: 'linear-gradient(135deg,#34d399,#059669)' }}><CheckCircle size={18} /></span>
-              <div><b>Delivered</b><span className="muted">Galle · 2 min ago</span></div>
-            </div>
-
-            <div className="track-card">
-              <div className="track-head">
-                <div>
-                  <p className="eyebrow">Tracking number</p>
-                  <p className="track-id">SWF-2024-001234</p>
-                </div>
-                <span className="badge badge-transit">● In Transit</span>
-              </div>
-
-              <div className="track-map">
-                <svg viewBox="0 0 400 150" preserveAspectRatio="none">
-                  <path d="M40 115 C 120 120, 140 40, 210 70 S 320 30, 360 35"
-                    fill="none" stroke="url(#rg)" strokeWidth="4" strokeLinecap="round" strokeDasharray="2 10" />
-                  <defs>
-                    <linearGradient id="rg" x1="0" x2="1">
-                      <stop offset="0" stopColor="#14b8a6" /><stop offset="1" stopColor="#0ea5e9" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <span className="pin" style={{ left: '8%', top: '72%', background: '#14b8a6' }} />
-                <span className="pin" style={{ left: '50%', top: '42%', background: '#f97316' }} />
-                <span className="pin" style={{ left: '88%', top: '19%', background: '#0ea5e9' }} />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700 }}>
-                <span>Colombo</span><span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>ETA 4:30 PM</span><span>Kandy</span>
-              </div>
-              <div className="track-progress"><div /></div>
-              <div className="track-steps">
-                <span className="on">Booked</span><span className="on">Picked up</span><span className="on">In transit</span><span>Delivered</span>
-              </div>
-
-              <div className="track-courier">
-                <span className="avatar-ink" style={{ width: 38, height: 38 }}>KS</span>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 14, fontWeight: 700 }}>Kasun Silva</p>
-                  <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Your courier · Bike</p>
-                </div>
-                <span className="header-icon-btn" style={{ width: 36, height: 36, color: 'var(--primary)' }}><Phone size={16} /></span>
-              </div>
-            </div>
-
-            <div className="float-chip c2">
-              <span className="ico" style={{ background: 'var(--grad-warm)' }}><Zap size={18} /></span>
-              <div><b>Same-day</b><span className="muted">Delivery available</span></div>
-            </div>
+          {/* RIGHT — courier image */}
+          <div className="hero-dark-right animate-fade-in delay-2">
+            <img
+              src={heroCourierImg}
+              alt="SwiftDrop courier delivering parcel"
+              className="hero-dark-img"
+            />
           </div>
-        </div>
 
-        <div className="container" style={{ marginTop: 56 }}>
-          <div className="trust-strip animate-fade-in delay-4">
-            {[
-              { icon: <CheckCircle size={16} />, text: '50,000+ Deliveries' },
-              { icon: <Star size={16} />, text: '4.9★ Rating' },
-              { icon: <Clock size={16} />, text: 'Same-Day Delivery' },
-              { icon: <Shield size={16} />, text: 'Fully Insured' },
-            ].map((b, i) => <div key={i}>{b.icon}{b.text}</div>)}
-          </div>
         </div>
       </section>
 
@@ -180,7 +184,7 @@ const LandingPage: React.FC = () => {
       <section className="section" id="roles">
         <div className="container">
           <div className="section-head">
-            <span className="section-label"><Users size={14} /> For Everyone</span>
+
             <h2 className="section-title">One platform, <span className="gradient-text">four roles</span></h2>
             <p className="section-subtitle">
               Whether you're sending a parcel or managing a fleet, SwiftDrop has you covered.
@@ -189,12 +193,24 @@ const LandingPage: React.FC = () => {
 
           <div className="role-cards">
             {ROLES.map(r => (
-              <Link key={r.role} to={r.path} className="role-card"
-                style={{ '--c': r.c, '--g': r.g } as React.CSSProperties}>
-                <span className="role-icon">{r.icon}</span>
-                <p className="role-name">{r.role}</p>
-                <p className="role-desc">{r.desc}</p>
-                <span className="role-go">Get started <ArrowRight size={15} /></span>
+              <Link
+                key={r.role}
+                to={r.path}
+                className="role-card role-card-photo"
+                style={{ '--c': r.c, '--g': r.g } as React.CSSProperties}
+              >
+                <div className="role-card-thumb">
+                  <img src={r.image} alt={r.role} className="role-thumb-img" loading="lazy" />
+                  <span className="role-tag-badge">{r.tag}</span>
+                  <span className="role-icon-float">{r.icon}</span>
+                </div>
+                <div className="role-card-body">
+                  <p className="role-name">{r.role}</p>
+                  <p className="role-desc">{r.desc}</p>
+                  <span className="role-go">
+                    Explore {r.role} <ArrowRight size={15} />
+                  </span>
+                </div>
               </Link>
             ))}
           </div>
@@ -205,7 +221,7 @@ const LandingPage: React.FC = () => {
       <section className="section" id="features" style={{ paddingTop: 0 }}>
         <div className="container">
           <div className="section-head">
-            <span className="section-label"><Sparkles size={14} /> Why SwiftDrop</span>
+
             <h2 className="section-title">Built for the modern delivery era</h2>
             <p className="section-subtitle">
               Packed with features that make every delivery smoother, faster, and more transparent.
@@ -225,6 +241,49 @@ const LandingPage: React.FC = () => {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Fleet Showcase */}
+      <section className="section" style={{ paddingTop: 0, paddingBottom: 40 }}>
+        <div className="container">
+          <div className="fleet-banner-card animate-fade-in">
+            <div
+              className="fleet-banner-bg"
+              style={{
+                backgroundImage:
+                  "url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1200&q=80')",
+              }}
+            />
+            <div className="fleet-banner-content">
+              <span className="pill" style={{ background: 'rgba(255, 255, 255, 0.2)', color: '#fff' }}>
+                <Truck size={13} /> Nationwide Logistics
+              </span>
+              <h2>Connecting Every Corner of Sri Lanka</h2>
+              <p>
+                From downtown Colombo to Jaffna, Kandy, Galle, and Batticaloa — our verified multi-vehicle
+                fleet delivers your parcels safely, on time, with full tracking and proof of delivery.
+              </p>
+              <div className="fleet-banner-badges">
+                <div>
+                  <b>25</b>
+                  <span>Districts Covered</span>
+                </div>
+                <div>
+                  <b>350+</b>
+                  <span>Active Couriers</span>
+                </div>
+                <div>
+                  <b>99.4%</b>
+                  <span>On-Time Dispatch</span>
+                </div>
+                <div>
+                  <b>100%</b>
+                  <span>Insured Deliveries</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
