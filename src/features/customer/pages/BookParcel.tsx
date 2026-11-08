@@ -231,7 +231,7 @@ const BookParcel: React.FC = () => {
           user.role === "merchant" ? "merchant" : "customer",
 
         recipientName: form.recipientName.trim(),
-        recipientPhone: form.recipientPhone.trim(),
+        recipientPhone: form.recipientPhone.replace(/[-\s]/g, "").trim(),
 
         recipientAddress: {
           street: form.deliveryStreet.trim(),
@@ -585,9 +585,9 @@ const BookParcel: React.FC = () => {
                             id="recipientPhone"
                             type="tel"
                             className="form-input"
-                            placeholder="0771234567"
-                            pattern="(?:0[0-9]{9}|\+94[0-9]{9})"
-                            title="Enter 10 digits starting with 0, or +94 followed by 9 digits"
+                            placeholder="0771234567 or 077-1234567"
+                            pattern="(?:0\d{2}[-\s]?\d{3}[-\s]?\d{4}|0\d{9}|\+94\d{2}[-\s]?\d{3}[-\s]?\d{4}|\+94\d{9})"
+                            title="Enter 10 digits (e.g. 0771234567 or 077-1234567), or +94 followed by 9 digits"
                             value={form.recipientPhone}
                             onChange={(event) =>
                               update(

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Search, Package, FileText, Download } from "lucide-react";
+import { Search, Package, FileText, Download, Star } from "lucide-react";
 
 import DashboardLayout from "../../../components/layout/DashboardLayout";
 import {
@@ -8,10 +8,11 @@ import {
   EmptyState,
   Modal,
   StatusTimeline,
+  useToast,
 } from "../../../components/shared/SharedComponents";
 
 import { useAuth } from "../../auth/context/AuthContext";
-import { useParcels } from "../services/parcel-store";
+import { useParcels, saveParcel } from "../services/parcel-store";
 import { downloadReceipt } from "../services/receipt";
 
 import type { Parcel } from "../../../types/global.types";
@@ -45,6 +46,12 @@ const MyParcels: React.FC = () => {
     useState<Parcel | null>(null);
 
   const [receiptError, setReceiptError] = useState("");
+
+  const { showToast } = useToast();
+  const [feedbackParcel, setFeedbackParcel] = useState<Parcel | null>(null);
+  const [ratingVal, setRatingVal] = useState<number>(5);
+  const [hoverRating, setHoverRating] = useState<number | null>(null);
+  const [feedbackComment, setFeedbackComment] = useState("");
 
   const myParcels = useParcels().filter(
     (parcel) => parcel.senderId === user?.id,
@@ -113,6 +120,22 @@ const MyParcels: React.FC = () => {
         "Unable to download receipt. Please try again.",
       );
     }
+  }
+
+  function handleFeedbackSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!feedbackParcel) return;
+
+    const updated: Parcel = {
+      ...feedbackParcel,
+      rating: ratingVal,
+      feedbackComment: feedbackComment.trim() || undefined,
+      feedbackSubmittedAt: new Date().toISOString(),
+    };
+
+    saveParcel(updated);
+    showToast("Thank you! Your feedback has been recorded.", "success");
+    setFeedbackParcel(null);
   }
 
   return (
@@ -315,13 +338,40 @@ const MyParcels: React.FC = () => {
                     </td>
 
                     <td>
-                      {new Date(
-                        parcel.createdAt,
-                      ).toLocaleDateString("en-LK")}
+                      <div>
+                        {new Date(
+                          parcel.createdAt,
+                        ).toLocaleDateString("en-LK")}
+                      </div>
+                      {[
+                        "pending",
+                        "assigned",
+                        "picked_up",
+                        "in_transit",
+                        "out_for_delivery",
+                      ].includes(parcel.status) &&
+                        parcel.estimatedDeliveryDate && (
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "var(--primary-light)",
+                              fontWeight: 600,
+                              marginTop: 2,
+                            }}
+                          >
+                            Est: {parcel.estimatedDeliveryDate}
+                          </div>
+                        )}
                     </td>
 
                     <td>
-                      <div style={{ display: "flex", gap: 6 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 6,
+                          alignItems: "center",
+                        }}
+                      >
                         <button
                           className="btn btn-ghost btn-sm"
                           onClick={() =>
@@ -332,16 +382,62 @@ const MyParcels: React.FC = () => {
                         </button>
 
                         {parcel.status === "delivered" && (
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            aria-label={`View receipt for ${parcel.trackingNumber}`}
-                            onClick={() => {
-                              setReceiptError("");
-                              setShowReceipt(parcel);
-                            }}
-                          >
-                            <FileText size={12} />
-                          </button>
+                          <>
+                            <button
+                              className={`btn btn-sm ${
+                                parcel.rating
+                                  ? "btn-ghost"
+                                  : "btn-secondary"
+                              }`}
+                              style={{
+                                color: parcel.rating
+                                  ? "#d97706"
+                                  : "var(--text-secondary)",
+                                gap: 4,
+                                padding: "4px 8px",
+                              }}
+                              onClick={() => {
+                                setFeedbackParcel(parcel);
+                                setRatingVal(parcel.rating ?? 5);
+                                setFeedbackComment(
+                                  parcel.feedbackComment ?? "",
+                                );
+                              }}
+                              title={
+                                parcel.rating
+                                  ? `Rated ${parcel.rating}★`
+                                  : "Rate this delivery"
+                              }
+                            >
+                              <Star
+                                size={12}
+                                fill={
+                                  parcel.rating
+                                    ? "#f59e0b"
+                                    : "none"
+                                }
+                                color={
+                                  parcel.rating
+                                    ? "#f59e0b"
+                                    : "currentColor"
+                                }
+                              />
+                              {parcel.rating
+                                ? `${parcel.rating}★`
+                                : "Rate"}
+                            </button>
+
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              aria-label={`View receipt for ${parcel.trackingNumber}`}
+                              onClick={() => {
+                                setReceiptError("");
+                                setShowReceipt(parcel);
+                              }}
+                            >
+                              <FileText size={12} />
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -489,6 +585,149 @@ const MyParcels: React.FC = () => {
               ))}
             </div>
           </div>
+        )}
+      </Modal>
+      <Modal
+        isOpen={!!feedbackParcel}
+        onClose={() => setFeedbackParcel(null)}
+        title="Delivery Feedback & Rating"
+        size="md"
+      >
+        {feedbackParcel && (
+          <form
+            onSubmit={handleFeedbackSubmit}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
+            <div>
+              <p style={{ fontWeight: 600, marginBottom: 4 }}>
+                How was your delivery for {feedbackParcel.trackingNumber}?
+              </p>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "var(--text-secondary)",
+                }}
+              >
+                Delivered to {feedbackParcel.recipientName} (
+                {feedbackParcel.recipientAddress.city})
+              </p>
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 8,
+                }}
+              >
+                Rating (1 - 5 Stars)
+              </label>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                }}
+              >
+                {[1, 2, 3, 4, 5].map((star) => {
+                  const active =
+                    (hoverRating ?? ratingVal) >= star;
+                  return (
+                    <button
+                      key={star}
+                      type="button"
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: 4,
+                        color: active
+                          ? "#f59e0b"
+                          : "var(--border)",
+                        transition: "transform 0.15s ease",
+                      }}
+                      onMouseEnter={() =>
+                        setHoverRating(star)
+                      }
+                      onMouseLeave={() =>
+                        setHoverRating(null)
+                      }
+                      onClick={() => setRatingVal(star)}
+                      aria-label={`${star} star`}
+                    >
+                      <Star
+                        size={26}
+                        fill={active ? "#f59e0b" : "none"}
+                      />
+                    </button>
+                  );
+                })}
+                <span
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    marginLeft: 8,
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  {hoverRating ?? ratingVal} / 5 Stars
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor="feedback-comment"
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                Comments (Optional)
+              </label>
+              <textarea
+                id="feedback-comment"
+                className="form-input"
+                rows={3}
+                placeholder="Share your experience (e.g. Courier was on time, package arrived safely)..."
+                value={feedbackComment}
+                onChange={(e) =>
+                  setFeedbackComment(e.target.value)
+                }
+              />
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                justifyContent: "flex-end",
+                marginTop: 8,
+              }}
+            >
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setFeedbackParcel(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary btn-sm"
+              >
+                Submit Feedback
+              </button>
+            </div>
+          </form>
         )}
       </Modal>
     </DashboardLayout>

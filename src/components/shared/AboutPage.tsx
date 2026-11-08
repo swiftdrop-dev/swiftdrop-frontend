@@ -55,9 +55,7 @@ const AboutPage: React.FC = () => {
         textAlign: 'center',
       }}>
         <div className="container" style={{ maxWidth: 760 }}>
-          <span className="pill" style={{ background: 'rgba(14,165,233,0.18)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.3)', marginBottom: 20, display: 'inline-flex' }}>
-            Our Story
-          </span>
+
           <h1 style={{ fontSize: 'clamp(32px, 5vw, 54px)', fontWeight: 800, color: '#fff', lineHeight: 1.1, marginBottom: 20 }}>
             Connecting Sri Lanka,{' '}
             <span style={{ color: '#f97316' }}>One Delivery at a Time</span>
@@ -220,3 +218,4 @@ const AboutPage: React.FC = () => {
 };
 
 export default AboutPage;
+
