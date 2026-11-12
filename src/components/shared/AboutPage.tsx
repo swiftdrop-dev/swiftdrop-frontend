@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Package, Users, Truck, Shield, MapPin, Star,
+  Package, Truck, Shield, MapPin, Star,
   CheckCircle, Zap, ArrowRight, Heart,
 } from 'lucide-react';
 

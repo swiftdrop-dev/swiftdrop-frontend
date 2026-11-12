@@ -1,53 +1,75 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import heroCourierImg from '../../assets/hero-courier.jpg';
+import swiftDropMark from '../../assets/swiftdrop-mark.svg';
+import proofOfDeliveryImg from '../../assets/proof-of-delivery.svg';
+import './LandingPage.css';
 import {
   Package, Zap, MapPin, Shield, BarChart2,
   ArrowRight, CheckCircle, Truck, Store, Users, Activity,
-  ShoppingBag, Bike, SlidersHorizontal, Sparkles, Home,
+  Home, Menu, X, Info, Mail, ClipboardList, Banknote,
 } from 'lucide-react';
 
-const ROLES = [
+const SERVICES = [
   {
-    icon: <ShoppingBag size={22} />,
-    role: 'Customer',
-    path: '/login',
-    tag: 'Personal & Gifts',
-    image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=600&q=80',
-    desc: 'Book parcels in seconds, track in real-time, and get digital proof of delivery.',
+    icon: <Package size={22} />,
+    role: 'Door-to-Door Delivery',
+    path: '/register',
+    tag: 'Convenient Shipping',
+    image: heroCourierImg,
+    desc: 'Book a parcel online with pickup and delivery details, and let our couriers handle the journey.',
     c: '#0d9488',
     g: 'linear-gradient(135deg,#2dd4bf,#0d9488)',
   },
   {
-    icon: <Store size={22} />,
-    role: 'Merchant',
-    path: '/login',
-    tag: 'E-commerce & Retail',
-    image: 'https://images.unsplash.com/photo-1556740738-b6a63e27c4df?auto=format&fit=crop&w=600&q=80',
-    desc: 'Bulk shipping, merchant APIs, webhooks, and cash-on-delivery management.',
+    icon: <MapPin size={22} />,
+    role: 'Real-Time Tracking',
+    path: '/track',
+    tag: 'Stay Updated',
+    image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80',
+    desc: 'Follow your parcel with its tracking number and see delivery status updates in one place.',
     c: '#0284c7',
     g: 'linear-gradient(135deg,#38bdf8,#0284c7)',
   },
   {
-    icon: <Bike size={22} />,
-    role: 'Courier',
-    path: '/login',
-    tag: 'Riders & Drivers',
-    image: 'https://images.unsplash.com/photo-1616401784845-180882ba9ba8?auto=format&fit=crop&w=600&q=80',
-    desc: 'View your delivery queue, update statuses, upload photo proof, and enter OTP.',
+    icon: <Banknote size={22} />,
+    role: 'Cash on Delivery',
+    path: '/register',
+    tag: 'Flexible Payments',
+    image: 'https://images.unsplash.com/photo-1556740738-b6a63e27c4df?auto=format&fit=crop&w=800&q=80',
+    desc: 'Choose cash on delivery when booking and manage your parcel payment details online.',
     c: '#ea580c',
     g: 'linear-gradient(135deg,#fb923c,#ea580c)',
   },
   {
-    icon: <SlidersHorizontal size={22} />,
-    role: 'Dispatcher',
-    path: '/login',
-    tag: 'Hub Operations',
+    icon: <Store size={22} />,
+    role: 'Bulk Business Shipping',
+    path: '/register',
+    tag: 'For Merchants',
     image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=600&q=80',
-    desc: 'Assign routes, balance courier workloads, and generate analytical business reports.',
+    desc: 'Create multiple shipments with bulk booking and keep your business deliveries organised.',
     c: '#7c3aed',
     g: 'linear-gradient(135deg,#a78bfa,#7c3aed)',
   },
+  {
+    icon: <Zap size={22} />, role: 'Instant Fee Estimates', path: '/register', tag: 'Plan Your Delivery',
+    image: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=800&q=80',
+    desc: 'Check an estimated shipping fee using your parcel details before confirming a booking.',
+    c: '#0284c7', g: 'linear-gradient(135deg,#38bdf8,#0284c7)',
+  },
+  {
+    icon: <Shield size={22} />, role: 'Proof of Delivery', path: '/track', tag: 'Delivery Confidence',
+    image: proofOfDeliveryImg,
+    desc: 'Delivery photos, signatures and OTP verification help confirm your parcel reached its recipient.',
+    c: '#0d9488', g: 'linear-gradient(135deg,#2dd4bf,#0d9488)',
+  },
+];
+
+const DELIVERY_STEPS = [
+  { icon: <ClipboardList size={30} />, title: 'Book Your Parcel', desc: 'Create an account, enter pickup and recipient details, and check your delivery fee.' },
+  { icon: <Package size={30} />, title: 'We Collect', desc: 'A courier is assigned to your parcel and collects it from the pickup location.' },
+  { icon: <Truck size={30} />, title: 'Track the Journey', desc: 'Use your tracking number to follow status updates as your parcel moves towards its destination.' },
+  { icon: <CheckCircle size={30} />, title: 'Delivery Confirmed', desc: 'Your courier completes the delivery with proof such as a photo, signature or OTP verification.' },
 ];
 
 const FEATURES = [
@@ -80,6 +102,35 @@ const FEATURES = [
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const [quickTrack, setQuickTrack] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [navCompact, setNavCompact] = useState(false);
+  const processRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const section = processRef.current;
+    if (!section || !('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        section.classList.add('is-visible');
+        observer.disconnect();
+      }
+    }, { threshold: 0.12 });
+    section.classList.add('process-motion-ready');
+    observer.observe(section);
+    return () => {
+      observer.disconnect();
+      section.classList.remove('process-motion-ready', 'is-visible');
+    };
+  }, []);
+
+  useEffect(() => {
+    const updateNavbar = () => {
+      setNavCompact((compact) => window.scrollY > (compact ? 24 : 80));
+    };
+    updateNavbar();
+    window.addEventListener('scroll', updateNavbar, { passive: true });
+    return () => window.removeEventListener('scroll', updateNavbar);
+  }, []);
 
   const handleQuickTrack = (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,25 +142,30 @@ const LandingPage: React.FC = () => {
   return (
     <div className="landing">
       {/* Navbar */}
-      <nav className="landing-nav landing-nav-dark">
-        <Link to="/" className="brand">
-          <div className="brand-mark"><Package size={19} strokeWidth={2.25} /></div>
+      <div className={`landing-nav-shell${navCompact ? ' is-compact' : ''}`}>
+      <nav className="landing-nav landing-nav-dark" aria-label="Main navigation">
+        <Link to="/" className="brand" aria-label="SwiftDrop home">
+          <img className="landing-brand-mark" src={swiftDropMark} alt="" width="46" height="46" />
           <span className="brand-word">Swift<span>Drop</span></span>
         </Link>
 
-        <div className="landing-nav-menu">
-          <Link to="/" className="nav-link-icon"><Home size={14} /> Home</Link>
-          <a href="#roles">Services</a>
-          <Link to="/track">Track Parcel</Link>
-          <Link to="/about">About</Link>
-          <Link to="/contact">Contact</Link>
+        <div id="landing-navigation" className={`landing-nav-menu${menuOpen ? ' is-open' : ''}`} onClick={() => setMenuOpen(false)} onKeyDown={(e) => { if (e.key === 'Escape') setMenuOpen(false); }}>
+          <Link to="/" className="nav-link-icon is-active" aria-current="page"><span>Home</span><Home className="landing-link-icon" size={16} aria-hidden="true" /></Link>
+          <a href="#services"><span>Services</span><Truck className="landing-link-icon" size={16} aria-hidden="true" /></a>
+          <Link to="/track"><span>Track Parcel</span><MapPin className="landing-link-icon" size={16} aria-hidden="true" /></Link>
+          <Link to="/about"><span>About</span><Info className="landing-link-icon" size={16} aria-hidden="true" /></Link>
+          <Link to="/contact"><span>Contact</span><Mail className="landing-link-icon" size={16} aria-hidden="true" /></Link>
         </div>
 
         <div className="landing-nav-links">
           <Link to="/login" className="btn btn-nav-login btn-sm">Login</Link>
           <Link to="/register" className="btn btn-nav-signup btn-sm">Sign Up</Link>
+          <button type="button" className="landing-menu-toggle" aria-label={menuOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={menuOpen} aria-controls="landing-navigation" onClick={() => setMenuOpen(!menuOpen)}>
+            {menuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
         </div>
       </nav>
+      </div>
 
       {/* ── DARK SPLIT HERO ── */}
       <section className="hero-section hero-dark">
@@ -129,7 +185,7 @@ const LandingPage: React.FC = () => {
             <h1 className="hero-dark-title animate-fade-in delay-1">
               Fast, Reliable &amp;{' '}
               <span style={{ display: 'block' }}>
-                <span className="hero-dark-accent">Courier</span>{' '}Services
+                <span className="hero-dark-accent">Courier</span>{' '}Service
               </span>
             </h1>
 
@@ -177,22 +233,29 @@ const LandingPage: React.FC = () => {
             />
           </div>
 
+          <Link to="/track" className="hero-track-order">
+            <Truck size={20} aria-hidden="true" />
+            <span>Track Your Order</span>
+            <ArrowRight size={18} aria-hidden="true" />
+          </Link>
+
         </div>
       </section>
 
-      {/* Roles */}
-      <section className="section" id="roles">
+      {/* Delivery services */}
+      <section className="section landing-services" id="services" aria-labelledby="services-title">
         <div className="container">
           <div className="section-head">
 
-            <h2 className="section-title">One platform, <span className="gradient-text">four roles</span></h2>
+            <span className="landing-section-eyebrow">OUR SERVICES</span>
+            <h2 className="section-title" id="services-title">Delivery services, <span className="gradient-text">built around you</span></h2>
             <p className="section-subtitle">
-              Whether you're sending a parcel or managing a fleet, SwiftDrop has you covered.
+              From a single parcel to your next batch of orders, find a simpler way to ship with SwiftDrop.
             </p>
           </div>
 
-          <div className="role-cards">
-            {ROLES.map(r => (
+          <div className="service-cards">
+            {SERVICES.map(r => (
               <Link
                 key={r.role}
                 to={r.path}
@@ -208,11 +271,33 @@ const LandingPage: React.FC = () => {
                   <p className="role-name">{r.role}</p>
                   <p className="role-desc">{r.desc}</p>
                   <span className="role-go">
-                    Explore {r.role} <ArrowRight size={15} />
+                    {r.path === '/track' ? 'Track a parcel' : 'Get started'} <ArrowRight size={15} />
                   </span>
                 </div>
               </Link>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section ref={processRef} className="section landing-process" aria-labelledby="process-title">
+        <div className="container">
+          <div className="delivery-process-panel">
+            <div className="section-head">
+              <span className="landing-section-eyebrow">SIMPLE PROCESS</span>
+              <h2 className="section-title" id="process-title">How it <span className="gradient-text">works</span></h2>
+              <p className="section-subtitle">Four simple steps from booking to a confirmed delivery.</p>
+            </div>
+            <ol className="delivery-steps">
+              {DELIVERY_STEPS.map((step, index) => (
+                <li className="delivery-step" key={step.title}>
+                  <div className="delivery-step-icon" aria-hidden="true">{step.icon}</div>
+                  <span className="delivery-step-number">STEP {String(index + 1).padStart(2, '0')}</span>
+                  <h3>{step.title}</h3>
+                  <p>{step.desc}</p>
+                </li>
+              ))}
+            </ol>
           </div>
         </div>
       </section>
@@ -332,7 +417,7 @@ const LandingPage: React.FC = () => {
         <div className="container">
           <div className="landing-footer-inner">
             <Link to="/" className="brand">
-              <div className="brand-mark" style={{ width: 30, height: 30, borderRadius: 9 }}><Package size={15} /></div>
+              <img src={swiftDropMark} alt="" width="34" height="34" />
               <span className="brand-word" style={{ fontSize: 16 }}>Swift<span>Drop</span></span>
             </Link>
             <p>© 2024 SwiftDrop. All rights reserved. Sri Lanka's Premier Courier Platform.</p>

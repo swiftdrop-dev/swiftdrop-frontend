@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Package, MapPin, Phone, Mail, Clock, MessageSquare,
+  Package, MapPin, Phone, Mail, Clock,
   CheckCircle, ArrowRight, Send,
 } from 'lucide-react';
 
