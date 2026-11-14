@@ -32,6 +32,7 @@ const NAV_BY_ROLE: Record<UserRole, { section: string; items: NavItem[] }[]> = {
       section: 'Main',
       items: [
         { to: '/merchant', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
+        { to: '/merchant/onboarding', icon: <FileText size={18} />, label: 'Onboarding' },
         { to: '/merchant/book', icon: <PlusCircle size={18} />, label: 'New Booking' },
         { to: '/merchant/bulk', icon: <FileText size={18} />, label: 'Bulk Booking' },
         { to: '/merchant/parcels', icon: <List size={18} />, label: 'All Shipments' },
@@ -57,7 +58,18 @@ const NAV_BY_ROLE: Record<UserRole, { section: string; items: NavItem[] }[]> = {
         { to: '/dispatcher', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
         { to: '/dispatcher/parcels', icon: <Package size={18} />, label: 'All Parcels', badge: 5 },
         { to: '/dispatcher/assign', icon: <Users size={18} />, label: 'Assign Courier' },
+        { to: '/admin/merchants', icon: <CheckSquare size={18} />, label: 'Merchant Review' },
         { to: '/dispatcher/reports', icon: <BarChart2 size={18} />, label: 'Reports' },
+        { to: '/track', icon: <MapPin size={18} />, label: 'Track Parcel' },
+      ],
+    },
+  ],
+  admin: [
+    {
+      section: 'Administration',
+      items: [
+        { to: '/admin/merchants', icon: <CheckSquare size={18} />, label: 'Merchant Review' },
+        { to: '/dispatcher', icon: <LayoutDashboard size={18} />, label: 'Dispatch Console' },
         { to: '/track', icon: <MapPin size={18} />, label: 'Track Parcel' },
       ],
     },

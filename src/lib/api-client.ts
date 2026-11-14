@@ -7,31 +7,29 @@ export const apiClient = axios.create({
   },
 });
 
-// Attach JWT token from localStorage to every outgoing request
 apiClient.interceptors.request.use((config) => {
+  const storedUser = localStorage.getItem('swiftdrop_user');
+  if (storedUser) {
+    try {
+      const user = JSON.parse(storedUser);
+      if (user.id) {
+        config.headers['X-User-Id'] = user.id;
+      }
+      if (user.email) {
+        config.headers['X-User-Email'] = user.email;
+      }
+      if (user.role) {
+        config.headers['X-User-Roles'] = `ROLE_${user.role.toUpperCase()}`;
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }
+
   const token = localStorage.getItem('swiftdrop_token');
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    config.headers['Authorization'] = `Bearer ${token}`;
   }
+
   return config;
 });
-
-// Globally handle 401 Unauthorized — redirect to login only when a protected request fails
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    const isAuthEndpoint =
-      error.config?.url?.includes('/auth/login') ||
-      error.config?.url?.includes('/auth/register');
-
-    // Do not reload if the 401 is simply an incorrect password during login/register
-    if (error.response?.status === 401 && !isAuthEndpoint) {
-      localStorage.removeItem('swiftdrop_token');
-      localStorage.removeItem('swiftdrop_user');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
-    }
-    return Promise.reject(error);
-  },
-);

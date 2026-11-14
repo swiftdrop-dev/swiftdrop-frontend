@@ -1,4 +1,4 @@
-export type UserRole = 'customer' | 'merchant' | 'courier' | 'dispatcher';
+export type UserRole = 'customer' | 'merchant' | 'courier' | 'dispatcher' | 'admin';
 
 export interface User {
   id: string;
@@ -90,13 +90,13 @@ export interface Parcel {
   deliveredAt?: string;
   estimatedDeliveryDate?: string;
 
-  // Status history
-  statusHistory: StatusEvent[];
-
-  // Customer feedback (Priority C - M2 enhancement)
+  // Customer rating and feedback
   rating?: number;
   feedbackComment?: string;
   feedbackSubmittedAt?: string;
+
+  // Status history
+  statusHistory: StatusEvent[];
 }
 
 export interface StatusEvent {
