@@ -1,126 +1,91 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { Package, TrendingUp, Clock, CheckCircle, PlusCircle, BarChart2, Users } from 'lucide-react';
-import DashboardLayout from '../../../components/layout/DashboardLayout';
-import { StatCard, StatusBadge, SimpleBarChart } from '../../../components/shared/SharedComponents';
-import { useAuth } from '../../auth/context/AuthContext';
-import { MOCK_PARCELS, MOCK_REPORT } from '../../../lib/mockData';
-
-const MerchantDashboard: React.FC = () => {
-  const { user } = useAuth();
-  const myParcels = MOCK_PARCELS.filter(p => p.senderId === 'usr_002');
-
-  const stats = {
-    total: myParcels.length,
-    delivered: myParcels.filter(p => p.status === 'delivered').length,
-    pending: myParcels.filter(p => ['pending', 'assigned'].includes(p.status)).length,
-    revenue: myParcels.filter(p => p.paymentStatus === 'paid').reduce((sum, p) => sum + p.totalFee, 0),
-  };
-
-  const chartData = MOCK_REPORT.dailyStats.map(d => ({ label: d.date, value: d.total }));
-
+import { Link, useSearchParams } from "react-router-dom";
+import { Package } from "lucide-react";
+import {
+  StatCard,
+  EmptyState,
+} from "../../../components/shared/SharedComponents";
+import { MerchantApprovalBanner } from "../components/MerchantApprovalBanner";
+import { MerchantRequestState } from "../components/MerchantRequestState";
+import { MerchantOrderTable } from "../components/MerchantOrderTable";
+import { useMerchantProfile } from "../hooks/useMerchantProfile";
+import { useMerchantOrders } from "../hooks/useMerchantOrders";
+export default function MerchantDashboard() {
+  const profile = useMerchantProfile();
+  const orders = useMerchantOrders({ page: 0, size: 5 });
+  const [params] = useSearchParams();
+  const link = (path: string) =>
+    `${path}${import.meta.env.DEV && params.get("preview") ? `?preview=${params.get("preview")}` : ""}`;
   return (
-    <DashboardLayout>
-      {/* Welcome */}
-      <div className="banner">
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
-            {user?.name} Store
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
-            Manage your business shipments and track performance.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <Link to="/merchant/book" className="btn btn-primary">
-            <PlusCircle size={16} /> New Shipment
-          </Link>
-          <Link to="/merchant/bulk" className="btn btn-secondary">
-            <Users size={16} /> Bulk Book
-          </Link>
-        </div>
+    <>
+      <div className="page-header">
+        <h1 className="page-title">Merchant overview</h1>
+        <p>
+          Your business profile, integration credentials and shipments in one
+          workspace.
+        </p>
       </div>
-
-      {/* Stats */}
-      <div className="stats-grid" style={{ marginBottom: 24 }}>
-        <StatCard icon={<Package size={20} />} value={stats.total} label="Total Shipments" change={18} variant="primary" />
-        <StatCard icon={<CheckCircle size={20} />} value={stats.delivered} label="Delivered" change={22} variant="success" />
-        <StatCard icon={<Clock size={20} />} value={stats.pending} label="Awaiting Pickup" variant="warning" />
-        <StatCard icon={<TrendingUp size={20} />} value={`Rs. ${stats.revenue.toLocaleString()}`} label="Revenue Collected" change={15} variant="info" />
+      <MerchantRequestState loading={profile.isFetching} error={profile.error}>
+        <MerchantApprovalBanner profile={profile.data} />
+      </MerchantRequestState>
+      <div className="merchant-actions">
+        <Link
+          className="btn btn-primary"
+          to={link(profile.data ? "/merchant/profile" : "/merchant/onboarding")}
+        >
+          {profile.data ? "Manage profile" : "Complete onboarding"}
+        </Link>
+        <Link className="btn btn-secondary" to={link("/merchant/api-keys")}>
+          Manage API keys
+        </Link>
+        <Link className="btn btn-secondary" to={link("/merchant/orders/new")}>
+          New order
+        </Link>
+        <Link className="btn btn-ghost" to="/merchant/bulk">
+          Bulk booking demo
+        </Link>
       </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24 }}>
-        {/* Orders Table */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Recent Shipments</span>
-            <Link to="/merchant/parcels" className="btn btn-ghost btn-sm">View All</Link>
-          </div>
-          <div className="table-wrapper">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Tracking #</th>
-                  <th>Recipient</th>
-                  <th>To</th>
-                  <th>Status</th>
-                  <th>Fee</th>
-                  <th>Payment</th>
-                </tr>
-              </thead>
-              <tbody>
-                {myParcels.map((p, i) => (
-                  <tr key={p.id} className="animate-fade-in" style={{ animationDelay: `${i * 60}ms` }}>
-                    <td><strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--primary-light)' }}>{p.trackingNumber}</strong></td>
-                    <td>{p.recipientName}</td>
-                    <td>{p.recipientAddress.city}</td>
-                    <td><StatusBadge status={p.status} /></td>
-                    <td style={{ fontWeight: 600 }}>Rs. {p.totalFee.toLocaleString()}</td>
-                    <td>
-                      <span className={`badge ${p.paymentStatus === 'paid' ? 'badge-delivered' : 'badge-pending'}`}>
-                        {p.paymentStatus}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {orders.data && (
+        <div className="merchant-summary">
+          <StatCard
+            icon={<Package size={20} />}
+            value={orders.data.total}
+            label="Total merchant orders"
+            variant="primary"
+          />
         </div>
-
-        {/* Sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Chart */}
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title">Weekly Volume</span>
-              <BarChart2 size={16} color="var(--text-muted)" />
-            </div>
-            <div className="card-body">
-              <SimpleBarChart data={chartData.slice(-7)} />
-            </div>
-          </div>
-
-          {/* Quick Stats */}
-          <div className="card">
-            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Performance</p>
-              {[
-                { label: 'Success Rate', value: '94.2%', color: 'var(--success)' },
-                { label: 'Avg Delivery Time', value: '1.8 days', color: 'var(--info)' },
-                { label: 'COD Collected', value: 'Rs. 12,500', color: 'var(--warning)' },
-              ].map(s => (
-                <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>{s.label}</span>
-                  <span style={{ fontWeight: 700, color: s.color }}>{s.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+      )}
+      <section className="card">
+        <div className="card-header">
+          <h2 className="card-title">Recent orders</h2>
+          <Link to={link("/merchant/orders")}>View all</Link>
         </div>
-      </div>
-    </DashboardLayout>
+        <div className="card-body">
+          <MerchantRequestState
+            loading={orders.isFetching}
+            error={orders.error}
+            empty={orders.data?.data.length === 0}
+            emptyTitle="Your shipments will appear here"
+            emptyDescription="Once your merchant integration is ready, recent orders and their current status will be shown here."
+          >
+            {orders.data ? (
+              <MerchantOrderTable orders={orders.data.data} />
+            ) : (
+              <EmptyState
+                title="Your order workspace is ready"
+                description="Live shipments are unavailable while secure integration is being completed. You can review your business profile and credential settings."
+                action={
+                  <Link
+                    className="btn btn-secondary"
+                    to={link("/merchant/profile")}
+                  >
+                    Review business profile
+                  </Link>
+                }
+              />
+            )}
+          </MerchantRequestState>
+        </div>
+      </section>
+    </>
   );
-};
-
-export default MerchantDashboard;
+}
