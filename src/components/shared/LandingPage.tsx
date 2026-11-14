@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import heroCourierImg from '../../assets/hero-courier.jpg';
+import swiftDropTeamImg from '../../assets/swiftdrop-team.png';
 import swiftDropMark from '../../assets/swiftdrop-mark.svg';
 import proofOfDeliveryImg from '../../assets/proof-of-delivery.svg';
 import './LandingPage.css';
 import {
-  Package, Zap, MapPin, Shield, BarChart2,
-  ArrowRight, CheckCircle, Truck, Store, Users, Activity,
-  Home, Menu, X, Info, Mail, ClipboardList, Banknote,
+  Package, Zap, MapPin, Shield,
+  ArrowRight, CheckCircle, Truck, Store, Users,
+  Home, Menu, X, Info, Mail, ClipboardList, Banknote, Phone,
 } from 'lucide-react';
 
 const SERVICES = [
@@ -70,33 +71,6 @@ const DELIVERY_STEPS = [
   { icon: <Package size={30} />, title: 'We Collect', desc: 'A courier is assigned to your parcel and collects it from the pickup location.' },
   { icon: <Truck size={30} />, title: 'Track the Journey', desc: 'Use your tracking number to follow status updates as your parcel moves towards its destination.' },
   { icon: <CheckCircle size={30} />, title: 'Delivery Confirmed', desc: 'Your courier completes the delivery with proof such as a photo, signature or OTP verification.' },
-];
-
-const FEATURES = [
-  {
-    icon: <MapPin size={22} />, title: 'Real-Time Tracking', cls: 'wide',
-    desc: 'Know exactly where your parcel is at every step of the journey with live status updates.'
-  },
-  {
-    icon: <Zap size={22} />, title: 'Instant Fee Estimates', cls: '',
-    desc: 'Get accurate delivery cost estimates based on weight, size, distance, and package type.'
-  },
-  {
-    icon: <Shield size={22} />, title: 'Proof of Delivery', cls: '',
-    desc: 'Couriers upload photos and capture digital signatures to confirm successful deliveries.'
-  },
-  {
-    icon: <Activity size={22} />, title: 'Live Dashboard', cls: 'dark',
-    desc: 'Role-based dashboards give every user exactly the data they need, no more, no less.'
-  },
-  {
-    icon: <BarChart2 size={22} />, title: 'Business Reports', cls: '',
-    desc: 'Dispatchers access detailed delivery reports, revenue analytics, and courier performance.'
-  },
-  {
-    icon: <Truck size={22} />, title: 'Smart Assignment', cls: 'wide',
-    desc: 'Dispatchers assign or auto-assign parcels to the nearest available courier instantly.'
-  },
 ];
 
 const LandingPage: React.FC = () => {
@@ -256,9 +230,8 @@ const LandingPage: React.FC = () => {
 
           <div className="service-cards">
             {SERVICES.map(r => (
-              <Link
+              <article
                 key={r.role}
-                to={r.path}
                 className="role-card role-card-photo"
                 style={{ '--c': r.c, '--g': r.g } as React.CSSProperties}
               >
@@ -270,11 +243,8 @@ const LandingPage: React.FC = () => {
                 <div className="role-card-body">
                   <p className="role-name">{r.role}</p>
                   <p className="role-desc">{r.desc}</p>
-                  <span className="role-go">
-                    {r.path === '/track' ? 'Track a parcel' : 'Get started'} <ArrowRight size={15} />
-                  </span>
                 </div>
-              </Link>
+              </article>
             ))}
           </div>
         </div>
@@ -302,30 +272,56 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Features */}
-      <section className="section" id="features" style={{ paddingTop: 0 }}>
+      {/* Web portal */}
+      <section className="section landing-portal" id="features" aria-labelledby="portal-title" style={{ paddingTop: 0 }}>
         <div className="container">
           <div className="section-head">
 
-            <h2 className="section-title">Built for the modern delivery era</h2>
+            <span className="landing-section-eyebrow">YOUR DELIVERY WORKSPACE</span>
+            <h2 className="section-title" id="portal-title">SwiftDrop <span className="gradient-text">Web Portal</span></h2>
             <p className="section-subtitle">
-              Packed with features that make every delivery smoother, faster, and more transparent.
+              Everything you need to manage your deliveries, together in one place.
             </p>
           </div>
 
-          <div className="feature-grid">
-            {FEATURES.map((f, i) => (
-              <div key={i} className={`feature-card ${f.cls}`}>
-                <div className="feature-icon">{f.icon}</div>
-                <h3 className="feature-title">{f.title}</h3>
-                <p className="feature-desc">{f.desc}</p>
-                {f.cls === 'wide' && i === 0 && (
-                  <div className="mini-bars">
-                    {[40, 65, 50, 80, 60, 95, 75, 88, 70, 100].map((h, j) => <span key={j} style={{ height: `${h}%` }} />)}
-                  </div>
-                )}
+          <div className="portal-grid">
+            <article className="portal-card portal-intro">
+              <span className="portal-icon"><Package size={24} /></span>
+              <h3>Every delivery.<br />One simple dashboard.</h3>
+              <p>Book parcels, follow their journey and keep your delivery details organised, wherever you are.</p>
+            </article>
+            <article className="portal-card portal-access">
+              <div className="portal-access-title"><Shield size={22} /><h3>Your next delivery starts here</h3></div>
+              <p>Sign in to your SwiftDrop account to book and manage your parcels.</p>
+              <Link to="/login" className="portal-signin">Sign in <ArrowRight size={18} /></Link>
+            </article>
+            <div className="portal-team-frame">
+              <div className="portal-frame-bar"><span /><span /><span /><p>The people behind your deliveries</p></div>
+              <img className="portal-team-photo" src={swiftDropTeamImg} alt="SwiftDrop team wearing navy and orange branded shirts in the office" width="1536" height="1024" loading="lazy" />
+            </div>
+            <article className="portal-card portal-detail">
+              <div className="portal-tracking" aria-label="Illustration of delivery progress">
+                <span className="is-complete"><i /><b>Picked up</b></span>
+                <span className="is-complete"><i /><b>In transit</b></span>
+                <span><i /><b>Delivered</b></span>
               </div>
-            ))}
+              <h3>Follow every parcel</h3>
+              <p>Stay up to date from pickup to your recipient’s doorstep.</p>
+            </article>
+            <article className="portal-card portal-detail">
+              <div className="portal-preview"><span className="portal-icon"><Banknote size={24} /></span><div><small>PAYMENT OPTIONS</small><strong>Cash on delivery</strong></div><span className="portal-chip">COD</span></div>
+              <h3>Payments, kept simple</h3>
+              <p>Choose cash on delivery and keep payment details with your shipment.</p>
+            </article>
+            <article className="portal-card portal-detail">
+              <div className="portal-preview portal-upload-preview" aria-label="Illustration of a bulk order upload">
+                <span className="portal-icon"><ClipboardList size={24} /></span>
+                <div className="portal-upload-content"><strong>upload_orders.csv</strong><small>Bulk order upload</small><div className="portal-upload-track" aria-hidden="true"><span /></div></div>
+                <span className="portal-chip">CSV</span>
+              </div>
+              <h3>Made for your business</h3>
+              <p>Organise bulk bookings and pickup details as your business grows.</p>
+            </article>
           </div>
         </div>
       </section>
@@ -395,20 +391,14 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* CTA */}
-      <section className="section" style={{ paddingTop: 0 }}>
-        <div className="container">
-          <div className="cta-block">
-            <h2>Ready to ship smarter?</h2>
-            <p>Join thousands of customers and merchants who trust SwiftDrop for every delivery.</p>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <Link to="/register" className="btn btn-primary btn-xl">
-                Create Free Account <ArrowRight size={18} />
-              </Link>
-              <Link to="/track" className="btn btn-secondary btn-xl">
-                <MapPin size={18} /> Track Parcel
-              </Link>
-            </div>
+      <section className="landing-contact-banner" aria-labelledby="delivery-contact-title">
+        <div className="container landing-contact-inner">
+          <div className="landing-contact-copy">
+            <span className="landing-contact-eyebrow">READY TO START YOUR DELIVERY?</span>
+            <h2 id="delivery-contact-title">Driven by care. Delivered with SwiftDrop.</h2>
+            <p>Connecting people and businesses through simpler, smarter deliveries.</p>
           </div>
+          <a className="landing-contact-phone" href="tel:+94112345678"><Phone size={22} aria-hidden="true" /><span>+94 11 234 5678</span></a>
         </div>
       </section>
 
