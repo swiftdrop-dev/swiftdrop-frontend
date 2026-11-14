@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import type { User, UserRole } from '../../../types/global.types';
-import { MOCK_USERS } from '../../../lib/mockData';
+import { authService } from '../../../services/auth.service';
+import axios from 'axios';
 
 interface AuthContextType {
   user: User | null;
@@ -20,51 +21,87 @@ interface RegisterData {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => {
+/** Reads and parses the stored user from localStorage on startup. */
+function loadStoredUser(): User | null {
+  try {
     const stored = localStorage.getItem('swiftdrop_user');
-    return stored ? JSON.parse(stored) : null;
-  });
+    return stored ? (JSON.parse(stored) as User) : null;
+  } catch {
+    return null;
+  }
+}
 
-  const login = useCallback(async (email: string, _password: string) => {
-    // Simulate API delay
-    await new Promise(r => setTimeout(r, 800));
+/** Extracts a human-readable message from an Axios error response. */
+function extractErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as { message?: string } | undefined;
+    return data?.message ?? fallback;
+  }
+  return fallback;
+}
 
-    const found = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (!found) {
-      return { success: false, error: 'Invalid email or password.' };
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(loadStoredUser);
+
+  // ── Login ─────────────────────────────────────────────────
+
+  const login = useCallback(async (email: string, password: string) => {
+    try {
+      const data = await authService.login({ email, password });
+
+      // Build the User object from the API response
+      const loggedInUser: User = {
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        role: data.role,
+      };
+
+      // Persist token and user separately
+      localStorage.setItem('swiftdrop_token', data.token);
+      localStorage.setItem('swiftdrop_user', JSON.stringify(loggedInUser));
+      setUser(loggedInUser);
+
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: extractErrorMessage(error, 'Invalid email or password.'),
+      };
     }
-
-    setUser(found);
-    localStorage.setItem('swiftdrop_user', JSON.stringify(found));
-    return { success: true };
   }, []);
+
+  // ── Logout ────────────────────────────────────────────────
 
   const logout = useCallback(() => {
+    authService.logout();
     setUser(null);
-    localStorage.removeItem('swiftdrop_user');
   }, []);
 
-  const register = useCallback(async (data: RegisterData) => {
-    await new Promise(r => setTimeout(r, 800));
+  // ── Register ──────────────────────────────────────────────
 
-    const exists = MOCK_USERS.find(u => u.email.toLowerCase() === data.email.toLowerCase());
-    if (exists) {
-      return { success: false, error: 'Email already registered.' };
+  const register = useCallback(async (formData: RegisterData) => {
+    try {
+      const data = await authService.register(formData);
+
+      const newUser: User = {
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        role: data.role,
+      };
+
+      localStorage.setItem('swiftdrop_token', data.token);
+      localStorage.setItem('swiftdrop_user', JSON.stringify(newUser));
+      setUser(newUser);
+
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: extractErrorMessage(error, 'Registration failed. Please try again.'),
+      };
     }
-
-    const newUser: User = {
-      id: `usr_${Date.now()}`,
-      email: data.email,
-      name: data.name,
-      role: data.role,
-      phone: data.phone,
-    };
-
-    MOCK_USERS.push(newUser);
-    setUser(newUser);
-    localStorage.setItem('swiftdrop_user', JSON.stringify(newUser));
-    return { success: true };
   }, []);
 
   return (
