@@ -176,15 +176,15 @@ export const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({ userId, userName }
     setLimitError(false);
 
     try {
-      const { reply } = await chatbotService.sendMessage(text);
+      const { reply, remainingUses } = await chatbotService.sendMessage(text, userId);
       const newCount = incrementUsage(userId);
-      setUsageCount(newCount);
+      setUsageCount(remainingUses !== undefined ? FREE_LIMIT - remainingUses : newCount);
 
       const botMsg: ChatMessage = { role: 'bot', content: reply, timestamp: new Date() };
       setMessages(prev => [...prev, botMsg]);
 
       // If limit just reached
-      if (newCount >= FREE_LIMIT) {
+      if (newCount >= FREE_LIMIT || (remainingUses !== undefined && remainingUses <= 0)) {
         setMessages(prev => [
           ...prev,
           {
@@ -354,8 +354,7 @@ export const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({ userId, userName }
             {loading && <TypingIndicator />}
             <div ref={messagesEndRef} />
           </div>
-
-          // Limit reached banner 
+ 
           {isLimitReached && (
             <div
               style={{
@@ -377,7 +376,6 @@ export const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({ userId, userName }
             </div>
           )}
 
-          // Error banner
           {limitError && !isLimitReached && (
             <div
               style={{
