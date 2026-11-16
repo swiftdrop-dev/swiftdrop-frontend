@@ -10,6 +10,7 @@ const DEMO_ACCOUNTS: { role: UserRole; email: string; label: string; icon: React
   { role: 'merchant', email: 'merchant@demo.com', label: 'Merchant', icon: <Store /> },
   { role: 'courier', email: 'courier@demo.com', label: 'Courier', icon: <Bike /> },
   { role: 'dispatcher', email: 'dispatcher@demo.com', label: 'Dispatcher', icon: <SlidersHorizontal /> },
+  { role: 'admin', email: 'admin@demo.com', label: 'Admin', icon: <Lock /> },
 ];
 
 const LoginPage: React.FC = () => {
@@ -26,6 +27,7 @@ const LoginPage: React.FC = () => {
       merchant: '/merchant',
       courier: '/courier',
       dispatcher: '/dispatcher',
+      admin: '/admin/merchants',
     };
     return <Navigate to={redirects[user.role] ?? '/'} replace />;
   }
