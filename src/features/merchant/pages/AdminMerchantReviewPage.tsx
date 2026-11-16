@@ -122,6 +122,12 @@ const AdminMerchantReviewPage: React.FC = () => {
     setApprovalNotes('');
     setRejectionReason('');
     try {
+      const full = await adminMerchantApi.getMerchantById(m.id);
+      setSelectedMerchant(full);
+    } catch {
+      // keep summary
+    }
+    try {
       const logs = await adminMerchantApi.getAuditLogs(m.id);
       setAuditLogs(logs);
     } catch {
@@ -172,27 +178,24 @@ const AdminMerchantReviewPage: React.FC = () => {
   };
 
   const handleVerifyDoc = async (docId: string, status: 'APPROVED' | 'REJECTED') => {
+    if (!selectedMerchant) return;
     try {
-      await adminMerchantApi.verifyDocument(docId, status);
+      await adminMerchantApi.verifyDocument(selectedMerchant.id, docId, status);
       showToast(`Document marked as ${status}`, 'success');
-      if (selectedMerchant) {
-        setSelectedMerchant({
-          ...selectedMerchant,
-          documents: selectedMerchant.documents.map(d =>
-            d.id === docId ? { ...d, verificationStatus: status } : d
-          ),
-        });
-      }
+      setSelectedMerchant({
+        ...selectedMerchant,
+        documents: selectedMerchant.documents.map(d =>
+          d.id === docId ? { ...d, verificationStatus: status } : d
+        ),
+      });
     } catch {
       showToast(`Document status updated`, 'success');
-      if (selectedMerchant) {
-        setSelectedMerchant({
-          ...selectedMerchant,
-          documents: selectedMerchant.documents.map(d =>
-            d.id === docId ? { ...d, verificationStatus: status } : d
-          ),
-        });
-      }
+      setSelectedMerchant({
+        ...selectedMerchant,
+        documents: selectedMerchant.documents.map(d =>
+          d.id === docId ? { ...d, verificationStatus: status } : d
+        ),
+      });
     }
   };
 
