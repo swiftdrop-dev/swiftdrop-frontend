@@ -29,14 +29,16 @@ export interface MerchantContact {
 export interface MerchantAddress {
   id: string;
   hubName: string;
+  addressLabel?: string;
   addressLine1: string;
+  streetAddress?: string;
   addressLine2?: string;
   city: string;
   district: string;
   postalCode?: string;
   latitude: number;
   longitude: number;
-  contactPerson: string;
+  contactPerson?: string;
   contactPhone: string;
   isPrimaryPickup: boolean;
 }
@@ -45,7 +47,9 @@ export interface MerchantBankAccount {
   id: string;
   bankName: string;
   branchName: string;
-  accountNumber: string;
+  branchCode?: string;
+  accountNumber?: string;
+  maskedAccountNumber?: string;
   accountHolderName: string;
   settlementCycle: SettlementCycle;
   isVerified: boolean;
@@ -56,13 +60,16 @@ export interface MerchantDocument {
   id: string;
   documentType: DocumentType;
   documentName: string;
+  fileName?: string;
   fileUrl: string;
   fileSize?: number;
+  fileSizeBytes?: number;
   mimeType?: string;
   verificationStatus: VerificationStatus;
   rejectionReason?: string;
   verifiedAt?: string;
-  createdAt: string;
+  createdAt?: string;
+  uploadedAt?: string;
 }
 
 export interface MerchantApiCredential {
@@ -99,6 +106,7 @@ export interface MerchantProfile {
   tradeName?: string;
   registrationNumber: string;
   taxIdentificationNumber?: string;
+  taxId?: string;
   businessType: BusinessType;
   status: MerchantStatus;
   pricingTier: PricingTier;
@@ -106,12 +114,16 @@ export interface MerchantProfile {
   primaryContactName: string;
   primaryContactPhone: string;
   primaryContactEmail: string;
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
   rejectionReason?: string;
   verifiedAt?: string;
   createdAt: string;
   updatedAt: string;
   addresses: MerchantAddress[];
   bankAccount?: MerchantBankAccount;
+  bankAccounts?: MerchantBankAccount[];
   documents: MerchantDocument[];
   apiCredentials: MerchantApiCredential[];
 }
@@ -121,16 +133,21 @@ export interface RegisterMerchantPayload {
   tradeName?: string;
   registrationNumber: string;
   taxIdentificationNumber?: string;
+  taxId?: string;
   businessType: BusinessType;
-  primaryContactName: string;
-  primaryContactPhone: string;
-  primaryContactEmail: string;
+  primaryContactName?: string;
+  primaryContactPhone?: string;
+  primaryContactEmail?: string;
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
 }
 
 export interface UpdateMerchantProfilePayload {
   businessName?: string;
   tradeName?: string;
   taxIdentificationNumber?: string;
+  taxId?: string;
   businessType?: BusinessType;
   webhookUrl?: string;
   webhookSecret?: string;
@@ -138,14 +155,16 @@ export interface UpdateMerchantProfilePayload {
 
 export interface AddAddressPayload {
   hubName: string;
+  addressLabel?: string;
   addressLine1: string;
+  streetAddress?: string;
   addressLine2?: string;
   city: string;
   district: string;
   postalCode?: string;
   latitude: number;
   longitude: number;
-  contactPerson: string;
+  contactPerson?: string;
   contactPhone: string;
   isPrimaryPickup?: boolean;
 }
@@ -161,8 +180,10 @@ export interface SetBankAccountPayload {
 export interface UploadDocumentPayload {
   documentType: DocumentType;
   documentName: string;
+  fileName?: string;
   fileUrl: string;
   fileSize?: number;
+  fileSizeBytes?: number;
   mimeType?: string;
 }
 
