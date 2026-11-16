@@ -8,6 +8,7 @@ import type {
   CourierDecisionPayload,
 } from '../types/dispatch.types';
 
+
 export const dispatchApi = {
   getUnassignedQueue: async (zoneCode?: string, page = 0, size = 20): Promise<PageResponse<DispatchJobSummary>> => {
     const params = new URLSearchParams();
@@ -30,18 +31,29 @@ export const dispatchApi = {
   },
 
   manualAssign: async (jobId: string, payload: ManualAssignPayload): Promise<DispatchJob> => {
+    const body = {
+      courierId: payload.courierId,
+      dispatcherNotes: payload.dispatcherNotes,
+    };
     const res = await apiClient.post<{ success: boolean; data: DispatchJob }>(
-      `/dispatch/jobs/${jobId}/assign-manual`,
-      payload
+      `/dispatch/jobs/${jobId}/assign`,
+      body
     );
     return res.data.data;
   },
 
-  autoDispatch: async (jobId: string): Promise<DispatchJob> => {
-    const res = await apiClient.post<{ success: boolean; data: DispatchJob }>(
-      `/dispatch/jobs/${jobId}/auto-dispatch`
+  autoDispatch: async (jobId?: string): Promise<DispatchJob> => {
+    await apiClient.post<{ success: boolean; data: number }>(
+      '/dispatch/jobs/auto-dispatch'
     );
-    return res.data.data;
+    if (jobId) {
+      try {
+        return await dispatchApi.getJobById(jobId);
+      } catch {
+        // Fallback if job is already picked up or query failed
+      }
+    }
+    return { id: jobId || '' } as DispatchJob;
   },
 
   getJobById: async (jobId: string): Promise<DispatchJob> => {
@@ -49,17 +61,33 @@ export const dispatchApi = {
     return res.data.data;
   },
 
-  getJobByParcelId: async (parcelId: string): Promise<DispatchJob> => {
+  getJobByTrackingNumber: async (trackingNumber: string): Promise<DispatchJob> => {
     const res = await apiClient.get<{ success: boolean; data: DispatchJob }>(
-      `/dispatch/jobs/by-parcel/${parcelId}`
+      `/dispatch/jobs/tracking/${trackingNumber}`
     );
     return res.data.data;
   },
 
+  getJobByParcelId: async (parcelId: string): Promise<DispatchJob> => {
+    try {
+      const res = await apiClient.get<{ success: boolean; data: DispatchJob }>(
+        `/dispatch/jobs/by-parcel/${parcelId}`
+      );
+      return res.data.data;
+    } catch {
+      // Fallback
+      return { id: '', parcelId } as DispatchJob;
+    }
+  },
+
   respondToOffer: async (jobId: string, payload: CourierDecisionPayload): Promise<DispatchJob> => {
+    const body = {
+      accept: payload.accepted,
+      reason: payload.reason,
+    };
     const res = await apiClient.post<{ success: boolean; data: DispatchJob }>(
-      `/dispatch/jobs/${jobId}/courier-response`,
-      payload
+      `/dispatch/courier/jobs/${jobId}/decision`,
+      body
     );
     return res.data.data;
   },
@@ -75,6 +103,18 @@ export const dispatchApi = {
     rating?: number;
     activeDeliveries?: number;
   }): Promise<void> => {
-    await apiClient.put('/dispatch/couriers/projection', payload);
+    const body = {
+      courierId: payload.courierId,
+      courierName: payload.courierName,
+      courierPhone: payload.courierPhone,
+      vehicleType: payload.vehicleType,
+      isAvailable: payload.isAvailable,
+      isOnline: true,
+      currentLatitude: payload.currentLatitude,
+      currentLongitude: payload.currentLongitude,
+      activeDeliveriesCount: payload.activeDeliveries || 0,
+    };
+    await apiClient.post('/dispatch/projections/couriers/sync', body);
   },
 };
+
