@@ -45,7 +45,7 @@ const NAV_BY_ROLE: Record<UserRole, { section: string; items: NavItem[] }[]> = {
       section: 'Deliveries',
       items: [
         { to: '/courier', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
-        { to: '/courier/deliveries', icon: <Truck size={18} />, label: 'My Deliveries', badge: 3 },
+        { to: '/courier/deliveries', icon: <Truck size={18} />, label: 'My Deliveries' },
         { to: '/courier/proof', icon: <CheckSquare size={18} />, label: 'Proof of Delivery' },
         { to: '/track', icon: <MapPin size={18} />, label: 'Track Parcel' },
       ],

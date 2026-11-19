@@ -1,16 +1,8 @@
 import React, { useState } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Mail, Lock, Eye, EyeOff, Zap, ArrowRight, ShoppingBag, Store, Bike, SlidersHorizontal } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { AuthAside, AuthMobileLogo } from '../../../components/shared/AuthAside';
-import type { UserRole } from '../../../types/global.types';
-
-const DEMO_ACCOUNTS: { role: UserRole; email: string; label: string; icon: React.ReactNode }[] = [
-  { role: 'customer', email: 'customer@demo.com', label: 'Customer', icon: <ShoppingBag /> },
-  { role: 'merchant', email: 'merchant@demo.com', label: 'Merchant', icon: <Store /> },
-  { role: 'courier', email: 'courier@demo.com', label: 'Courier', icon: <Bike /> },
-  { role: 'dispatcher', email: 'dispatcher@demo.com', label: 'Dispatcher', icon: <SlidersHorizontal /> },
-];
 
 const LoginPage: React.FC = () => {
   const { login, isAuthenticated, user } = useAuth();
@@ -34,15 +26,12 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const result = await login(email, password);
-    setLoading(false);
-    if (!result.success) setError(result.error ?? 'Login failed');
-  };
-
-  const quickLogin = (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword('demo1234');
-    setError('');
+    try {
+      const result = await login(email, password);
+      if (!result.success) setError(result.error ?? 'Login failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -57,29 +46,6 @@ const LoginPage: React.FC = () => {
         <p className="eyebrow" style={{ marginBottom: 14, color: 'var(--signal)' }}>Sign in</p>
         <h1 className="auth-title">Welcome back</h1>
         <p className="auth-subtitle">Sign in to your SwiftDrop account</p>
-
-        {/* Demo Quick Login */}
-        <div>
-          <p className="eyebrow" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Zap size={12} /> Quick demo login
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            {DEMO_ACCOUNTS.map((acc, i) => (
-              <button
-                key={acc.role}
-                type="button"
-                onClick={() => quickLogin(acc.email)}
-                className={`role-pick ${email === acc.email ? 'selected' : ''}`}
-              >
-                {acc.icon}
-                <span>{acc.label}</span>
-                <small>0{i + 1}</small>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="auth-divider"><span>or sign in manually</span></div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="form-group">
