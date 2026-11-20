@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShieldCheck,
   CheckCircle,
@@ -39,7 +39,7 @@ const AdminMerchantReviewPage: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [approvedApiKey, setApprovedApiKey] = useState<ApiKeyCreatedResponse | null>(null);
 
-  const loadMerchants = async () => {
+  const loadMerchants = useCallback(async () => {
     setLoading(true);
     try {
       const res = await adminMerchantApi.getMerchants(statusFilter, 0, 50);
@@ -115,11 +115,11 @@ const AdminMerchantReviewPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
 
   useEffect(() => {
     loadMerchants();
-  }, [statusFilter]);
+  }, [loadMerchants]);
 
   const handleOpenReview = async (m: MerchantProfile) => {
     setSelectedMerchant(m);

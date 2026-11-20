@@ -135,7 +135,7 @@ interface ChatbotWidgetProps {
 
 export const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({ userId = 'guest', userName }) => {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       role: 'bot',
       content: `Hi ${userName ? userName.split(' ')[0] : 'there'}! 👋 I'm SwiftBot, your SwiftDrop assistant. I can help you track parcels, understand delivery statuses, and answer questions about our service.\n\nYou have ${FREE_LIMIT} free messages.`,

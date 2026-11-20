@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   CheckCircle,
   UserCheck,
@@ -37,7 +37,7 @@ const AssignCourier: React.FC = () => {
   const [dispatcherNotes, setDispatcherNotes] = useState<string>('');
 
   // Fetch unassigned queue from backend, fallback to mock if empty/offline
-  const loadUnassignedQueue = async () => {
+  const loadUnassignedQueue = useCallback(async () => {
     setLoading(true);
     try {
       const zoneParam = selectedZone === 'ALL' ? undefined : selectedZone;
@@ -98,11 +98,11 @@ const AssignCourier: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedZone]);
 
   useEffect(() => {
     loadUnassignedQueue();
-  }, [selectedZone]);
+  }, [loadUnassignedQueue]);
 
   // Open Proximity Matching Modal
   const handleOpenProximityModal = async (job: DispatchJobSummary) => {

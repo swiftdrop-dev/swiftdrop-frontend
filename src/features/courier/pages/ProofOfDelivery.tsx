@@ -55,13 +55,13 @@ const ProofOfDelivery: React.FC = () => {
   const completeDelivery = useMutation({ mutationFn: (args: { parcelId: string; challengeId: string; photoProofId: string }) => proofOfDeliveryApi.completeDelivery(args.parcelId, args.challengeId, args.photoProofId) });
 
   useEffect(() => {
-    if (!photo) {
-      setPhotoPreview(null);
-      return;
-    }
+    if (!photo) return;
     const objectUrl = URL.createObjectURL(photo);
     setPhotoPreview(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+      setPhotoPreview(null);
+    };
   }, [photo]);
 
   const anyRequestPending = requestOtp.isPending || verifyOtp.isPending || uploadPhoto.isPending || completeDelivery.isPending;
