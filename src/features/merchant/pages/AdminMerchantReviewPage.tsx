@@ -60,6 +60,12 @@ const AdminMerchantReviewPage: React.FC = () => {
           primaryContactName: 'Ruwan Perera',
           primaryContactPhone: '+94 77 123 4567',
           primaryContactEmail: 'ruwan@apex.lk',
+          contactName: 'Ruwan Perera',
+          contactPhone: '+94 77 123 4567',
+          contactEmail: 'ruwan@apex.lk',
+          pickupStreet: '124 Galle Road',
+          pickupCity: 'Colombo',
+          pickupDistrict: 'Colombo',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           addresses: [
