@@ -38,6 +38,7 @@ const NAV_BY_ROLE: Record<UserRole, { section: string; items: NavItem[] }[]> = {
         { to: '/merchant/onboarding', icon: <CheckSquare size={18} />, label: 'Onboarding' },
         { to: '/merchant/profile', icon: <Users size={18} />, label: 'Business Profile' },
         { to: '/merchant/api-keys', icon: <Settings size={18} />, label: 'API Keys' },
+        { to: '/merchant/parcels', icon: <List size={18} />, label: 'All Shipments' },
         { to: '/track', icon: <MapPin size={18} />, label: 'Track Parcel' },
       ],
     },
@@ -47,7 +48,7 @@ const NAV_BY_ROLE: Record<UserRole, { section: string; items: NavItem[] }[]> = {
       section: 'Deliveries',
       items: [
         { to: '/courier', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
-        { to: '/courier/deliveries', icon: <Truck size={18} />, label: 'My Deliveries', badge: 3 },
+        { to: '/courier/deliveries', icon: <Truck size={18} />, label: 'My Deliveries' },
         { to: '/courier/proof', icon: <CheckSquare size={18} />, label: 'Proof of Delivery' },
         { to: '/track', icon: <MapPin size={18} />, label: 'Track Parcel' },
       ],
@@ -60,7 +61,18 @@ const NAV_BY_ROLE: Record<UserRole, { section: string; items: NavItem[] }[]> = {
         { to: '/dispatcher', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
         { to: '/dispatcher/parcels', icon: <Package size={18} />, label: 'All Parcels', badge: 5 },
         { to: '/dispatcher/assign', icon: <Users size={18} />, label: 'Assign Courier' },
+        { to: '/admin/merchants', icon: <CheckSquare size={18} />, label: 'Merchant Review' },
         { to: '/dispatcher/reports', icon: <BarChart2 size={18} />, label: 'Reports' },
+        { to: '/track', icon: <MapPin size={18} />, label: 'Track Parcel' },
+      ],
+    },
+  ],
+  admin: [
+    {
+      section: 'Administration',
+      items: [
+        { to: '/admin/merchants', icon: <CheckSquare size={18} />, label: 'Merchant Review' },
+        { to: '/dispatcher', icon: <LayoutDashboard size={18} />, label: 'Dispatch Console' },
         { to: '/track', icon: <MapPin size={18} />, label: 'Track Parcel' },
       ],
     },

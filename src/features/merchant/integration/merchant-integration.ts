@@ -44,8 +44,14 @@ export const useMerchantIntegration = () =>
 export function previewIntegration(state: string): MerchantIntegration {
   const profile: MerchantProfile = {
     id: "preview",
+    userId: "preview-user",
     businessName: "Sample Merchant",
     registrationNumber: "SAMPLE-001",
+    businessType: "OTHER",
+    pricingTier: "STANDARD",
+    primaryContactName: "Sample Contact",
+    primaryContactPhone: "+94112345678",
+    primaryContactEmail: "sample@example.com",
     contactName: "Sample Contact",
     contactEmail: "sample@example.com",
     contactPhone: "+94112345678",
@@ -65,6 +71,9 @@ export function previewIntegration(state: string): MerchantIntegration {
     reviewedAt: null,
     createdAt: "2026-11-13T00:00:00Z",
     updatedAt: "2026-11-13T00:00:00Z",
+    addresses: [],
+    documents: [],
+    apiCredentials: [],
   };
   const order: MerchantOrder = {
     id: "00000000-0000-0000-0000-000000000001",

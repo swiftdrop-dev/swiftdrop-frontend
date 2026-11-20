@@ -4,8 +4,6 @@ import { useAuth } from '../../features/auth/context/AuthContext';
 
 // Public
 import LandingPage from '../../components/shared/LandingPage';
-import AboutPage from '../../components/shared/AboutPage';
-import ContactPage from '../../components/shared/ContactPage';
 import PublicTracking from '../../features/tracking/pages/PublicTracking';
 
 // Auth
@@ -22,6 +20,7 @@ import MerchantDashboard from '../../features/merchant/pages/MerchantDashboard';
 import BulkBooking from '../../features/merchant/pages/BulkBooking';
 import MerchantParcels from '../../features/merchant/pages/MerchantParcels';
 import { MerchantModuleBoundary, MerchantOnboarding, MerchantProfile, MerchantApiKeys, MerchantOrderCreate, MerchantOrders, MerchantOrderDetail } from '../../features/merchant';
+import AdminMerchantReviewPage from '../../features/merchant/pages/AdminMerchantReviewPage';
 
 // Courier
 import CourierDashboard from '../../features/courier/pages/CourierDashboard';
@@ -44,6 +43,7 @@ const RootRedirect: React.FC = () => {
     merchant: '/merchant',
     courier: '/courier',
     dispatcher: '/dispatcher',
+    admin: '/admin/merchants',
   };
   return <Navigate to={redirects[user!.role] ?? '/login'} replace />;
 };
@@ -54,8 +54,6 @@ export const AppRouter: React.FC = () => {
       <Routes>
         {/* Public */}
         <Route path="/" element={<RootRedirect />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/contact" element={<ContactPage />} />
         <Route path="/track" element={<PublicTracking />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -83,10 +81,14 @@ export const AppRouter: React.FC = () => {
         <Route path="/courier/proof" element={<ProtectedRoute allowedRoles={['courier']}><ProofOfDelivery /></ProtectedRoute>} />
 
         {/* Dispatcher */}
-        <Route path="/dispatcher" element={<ProtectedRoute allowedRoles={['dispatcher']}><DispatcherDashboard /></ProtectedRoute>} />
-        <Route path="/dispatcher/parcels" element={<ProtectedRoute allowedRoles={['dispatcher']}><DispatcherParcels /></ProtectedRoute>} />
-        <Route path="/dispatcher/assign" element={<ProtectedRoute allowedRoles={['dispatcher']}><AssignCourier /></ProtectedRoute>} />
-        <Route path="/dispatcher/reports" element={<ProtectedRoute allowedRoles={['dispatcher']}><Reports /></ProtectedRoute>} />
+        <Route path="/dispatcher" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><DispatcherDashboard /></ProtectedRoute>} />
+        <Route path="/dispatcher/parcels" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><DispatcherParcels /></ProtectedRoute>} />
+        <Route path="/dispatcher/assign" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><AssignCourier /></ProtectedRoute>} />
+        <Route path="/dispatcher/reports" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><Reports /></ProtectedRoute>} />
+
+        {/* Admin Compliance & Verification */}
+        <Route path="/admin/merchants" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><AdminMerchantReviewPage /></ProtectedRoute>} />
+        <Route path="/admin/merchants/pending" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><AdminMerchantReviewPage /></ProtectedRoute>} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
