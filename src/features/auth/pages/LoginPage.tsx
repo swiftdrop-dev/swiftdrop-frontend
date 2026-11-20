@@ -4,6 +4,16 @@ import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { AuthAside, AuthMobileLogo } from '../../../components/shared/AuthAside';
 
+import type { UserRole } from '../../../types/global.types';
+
+const DEMO_ACCOUNTS: { role: UserRole; email: string; label: string; icon: React.ReactNode }[] = [
+  { role: 'customer', email: 'customer@demo.com', label: 'Customer', icon: <ShoppingBag /> },
+  { role: 'merchant', email: 'merchant@demo.com', label: 'Merchant', icon: <Store /> },
+  { role: 'courier', email: 'courier@demo.com', label: 'Courier', icon: <Bike /> },
+  { role: 'dispatcher', email: 'dispatcher@demo.com', label: 'Dispatcher', icon: <SlidersHorizontal /> },
+  { role: 'admin', email: 'admin@demo.com', label: 'Admin', icon: <Lock /> },
+];
+
 const LoginPage: React.FC = () => {
   const { login, isAuthenticated, user } = useAuth();
   const [email, setEmail] = useState('');
@@ -18,6 +28,7 @@ const LoginPage: React.FC = () => {
       merchant: '/merchant',
       courier: '/courier',
       dispatcher: '/dispatcher',
+      admin: '/admin/merchants',
     };
     return <Navigate to={redirects[user.role] ?? '/'} replace />;
   }

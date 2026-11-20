@@ -18,48 +18,114 @@ import type {
   PricingTier,
 } from '../types/merchant.types';
 
+// Helper to normalize backend MerchantResponse into frontend MerchantProfile
+function normalizeMerchantProfile(data: any): MerchantProfile {
+  if (!data) return data;
+  const contacts = data.contacts || [];
+  const primaryContact = contacts[0] || {};
+
+  return {
+    ...data,
+    taxIdentificationNumber: data.taxId || data.taxIdentificationNumber,
+    primaryContactName: data.contactName || data.primaryContactName || primaryContact.contactName || '',
+    primaryContactPhone: data.contactPhone || data.primaryContactPhone || primaryContact.phone || '',
+    primaryContactEmail: data.contactEmail || data.primaryContactEmail || primaryContact.email || '',
+    bankAccount: data.bankAccount || (data.bankAccounts && data.bankAccounts[0]) || undefined,
+    addresses: (data.addresses || []).map((a: any) => ({
+      ...a,
+      hubName: a.hubName || a.addressLabel || 'Main Warehouse',
+      addressLine1: a.addressLine1 || a.streetAddress || '',
+      contactPerson: a.contactPerson || a.contactPhone || '',
+      contactPhone: a.contactPhone || '',
+      isPrimaryPickup: a.isPrimaryPickup ?? true,
+    })),
+    documents: (data.documents || []).map((d: any) => ({
+      ...d,
+      documentName: d.documentName || d.fileName || 'Document',
+      fileName: d.fileName || d.documentName,
+      fileSize: d.fileSize || d.fileSizeBytes,
+      createdAt: d.createdAt || d.uploadedAt || new Date().toISOString(),
+    })),
+    apiCredentials: data.apiCredentials || [],
+  };
+}
+
 export const merchantApi = {
   // Onboarding
   register: async (payload: RegisterMerchantPayload): Promise<MerchantProfile> => {
-    const res = await apiClient.post<{ success: boolean; data: MerchantProfile }>(
+    const body = {
+      businessName: payload.businessName,
+      tradeName: payload.tradeName,
+      registrationNumber: payload.registrationNumber,
+      taxId: payload.taxId || payload.taxIdentificationNumber,
+      businessType: payload.businessType,
+      contactName: payload.contactName || payload.primaryContactName,
+      contactPhone: payload.contactPhone || payload.primaryContactPhone,
+      contactEmail: payload.contactEmail || payload.primaryContactEmail,
+    };
+    const res = await apiClient.post<{ success: boolean; data: any }>(
       '/merchants/onboarding/register',
-      payload
+      body
     );
-    return res.data.data;
+    return normalizeMerchantProfile(res.data.data);
   },
 
   getMyProfile: async (): Promise<MerchantProfile> => {
-    const res = await apiClient.get<{ success: boolean; data: MerchantProfile }>(
-      '/merchants/onboarding/my-profile'
+    const res = await apiClient.get<{ success: boolean; data: any }>(
+      '/merchants/onboarding/me'
     );
-    return res.data.data;
+    return normalizeMerchantProfile(res.data.data);
   },
 
   getProfile: async (merchantId: string): Promise<MerchantProfile> => {
-    const res = await apiClient.get<{ success: boolean; data: MerchantProfile }>(
+    const res = await apiClient.get<{ success: boolean; data: any }>(
       `/merchants/onboarding/${merchantId}`
     );
-    return res.data.data;
+    return normalizeMerchantProfile(res.data.data);
   },
 
   updateProfile: async (merchantId: string, payload: UpdateMerchantProfilePayload): Promise<MerchantProfile> => {
-    const res = await apiClient.put<{ success: boolean; data: MerchantProfile }>(
-      `/merchants/onboarding/${merchantId}`,
-      payload
+    const body = {
+      businessName: payload.businessName,
+      tradeName: payload.tradeName,
+      taxId: payload.taxId || payload.taxIdentificationNumber,
+      businessType: payload.businessType,
+      webhookUrl: payload.webhookUrl,
+      webhookSecret: payload.webhookSecret,
+    };
+    const res = await apiClient.put<{ success: boolean; data: any }>(
+      `/merchants/onboarding/${merchantId}/profile`,
+      body
     );
-    return res.data.data;
+    return normalizeMerchantProfile(res.data.data);
   },
 
   addAddress: async (merchantId: string, payload: AddAddressPayload): Promise<MerchantAddress> => {
-    const res = await apiClient.post<{ success: boolean; data: MerchantAddress }>(
+    const body = {
+      addressLabel: payload.addressLabel || payload.hubName || 'Warehouse',
+      streetAddress: payload.streetAddress || payload.addressLine1 || '',
+      city: payload.city,
+      district: payload.district,
+      postalCode: payload.postalCode || '10000',
+      latitude: payload.latitude,
+      longitude: payload.longitude,
+      contactPhone: payload.contactPhone,
+      isPrimaryPickup: payload.isPrimaryPickup ?? false,
+    };
+    const res = await apiClient.post<{ success: boolean; data: any }>(
       `/merchants/onboarding/${merchantId}/addresses`,
-      payload
+      body
     );
-    return res.data.data;
+    const data = res.data.data;
+    return {
+      ...data,
+      hubName: data.hubName || data.addressLabel,
+      addressLine1: data.addressLine1 || data.streetAddress,
+    };
   },
 
   setBankAccount: async (merchantId: string, payload: SetBankAccountPayload): Promise<MerchantBankAccount> => {
-    const res = await apiClient.post<{ success: boolean; data: MerchantBankAccount }>(
+    const res = await apiClient.put<{ success: boolean; data: MerchantBankAccount }>(
       `/merchants/onboarding/${merchantId}/bank-account`,
       payload
     );
@@ -67,24 +133,36 @@ export const merchantApi = {
   },
 
   uploadDocument: async (merchantId: string, payload: UploadDocumentPayload): Promise<MerchantDocument> => {
-    const res = await apiClient.post<{ success: boolean; data: MerchantDocument }>(
+    const body = {
+      documentType: payload.documentType,
+      fileName: payload.fileName || payload.documentName || 'Document.pdf',
+      fileUrl: payload.fileUrl,
+      fileSizeBytes: payload.fileSizeBytes || payload.fileSize || 1024,
+      mimeType: payload.mimeType || 'application/pdf',
+    };
+    const res = await apiClient.post<{ success: boolean; data: any }>(
       `/merchants/onboarding/${merchantId}/documents`,
-      payload
+      body
     );
-    return res.data.data;
+    const data = res.data.data;
+    return {
+      ...data,
+      documentName: data.documentName || data.fileName,
+      createdAt: data.createdAt || data.uploadedAt,
+    };
   },
 
   submitForReview: async (merchantId: string): Promise<MerchantProfile> => {
-    const res = await apiClient.post<{ success: boolean; data: MerchantProfile }>(
+    const res = await apiClient.post<{ success: boolean; data: any }>(
       `/merchants/onboarding/${merchantId}/submit`
     );
-    return res.data.data;
+    return normalizeMerchantProfile(res.data.data);
   },
 
   // Credentials
   generateApiKey: async (merchantId: string, payload: GenerateApiKeyPayload = {}): Promise<ApiKeyCreatedResponse> => {
     const res = await apiClient.post<{ success: boolean; data: ApiKeyCreatedResponse }>(
-      `/merchants/${merchantId}/credentials/api-keys`,
+      `/merchants/${merchantId}/credentials`,
       payload
     );
     return res.data.data;
@@ -92,17 +170,17 @@ export const merchantApi = {
 
   listApiKeys: async (merchantId: string): Promise<MerchantApiCredential[]> => {
     const res = await apiClient.get<{ success: boolean; data: MerchantApiCredential[] }>(
-      `/merchants/${merchantId}/credentials/api-keys`
+      `/merchants/${merchantId}/credentials`
     );
     return res.data.data;
   },
 
   revokeApiKey: async (merchantId: string, credentialId: string): Promise<void> => {
-    await apiClient.delete(`/merchants/${merchantId}/credentials/api-keys/${credentialId}`);
+    await apiClient.delete(`/merchants/${merchantId}/credentials/${credentialId}`);
   },
 
   updateWebhook: async (merchantId: string, payload: UpdateWebhookPayload): Promise<void> => {
-    await apiClient.put(`/merchants/${merchantId}/credentials/webhook`, payload);
+    await apiClient.put(`/merchants/onboarding/${merchantId}/webhook`, payload);
   },
 };
 
@@ -117,17 +195,20 @@ export const adminMerchantApi = {
     params.append('page', page.toString());
     params.append('size', size.toString());
 
-    const res = await apiClient.get<{ success: boolean; data: PageResponse<MerchantProfile> }>(
+    const res = await apiClient.get<{ success: boolean; data: PageResponse<any> }>(
       `/merchants/admin?${params.toString()}`
     );
-    return res.data.data;
+    return {
+      ...res.data.data,
+      content: (res.data.data.content || []).map(normalizeMerchantProfile),
+    };
   },
 
   getMerchantById: async (merchantId: string): Promise<MerchantProfile> => {
-    const res = await apiClient.get<{ success: boolean; data: MerchantProfile }>(
-      `/merchants/admin/${merchantId}`
+    const res = await apiClient.get<{ success: boolean; data: any }>(
+      `/merchants/onboarding/${merchantId}`
     );
-    return res.data.data;
+    return normalizeMerchantProfile(res.data.data);
   },
 
   approveMerchant: async (
@@ -137,34 +218,42 @@ export const adminMerchantApi = {
   ): Promise<{ merchant: MerchantProfile; initialApiKey?: ApiKeyCreatedResponse }> => {
     const res = await apiClient.post<{
       success: boolean;
-      data: MerchantProfile;
+      data: any;
     }>(`/merchants/admin/${merchantId}/approve`, {
-      notes,
+      rejectionReason: notes,
       pricingTier,
     });
-    return { merchant: res.data.data };
+    return { merchant: normalizeMerchantProfile(res.data.data) };
   },
 
   rejectMerchant: async (merchantId: string, reason: string): Promise<MerchantProfile> => {
-    const res = await apiClient.post<{ success: boolean; data: MerchantProfile }>(
+    const res = await apiClient.post<{ success: boolean; data: any }>(
       `/merchants/admin/${merchantId}/reject`,
-      null,
-      { params: { reason } }
+      { rejectionReason: reason }
     );
-    return res.data.data;
+    return normalizeMerchantProfile(res.data.data);
   },
 
   verifyDocument: async (
+    merchantId: string,
     docId: string,
     status: 'APPROVED' | 'REJECTED',
     rejectionReason?: string
   ): Promise<MerchantDocument> => {
-    const res = await apiClient.put<{ success: boolean; data: MerchantDocument }>(
-      `/merchants/admin/documents/${docId}/verify`,
-      null,
-      { params: { status, rejectionReason } }
+    const query = new URLSearchParams({
+      approve: (status === 'APPROVED').toString(),
+    });
+    if (rejectionReason) query.append('reason', rejectionReason);
+
+    const res = await apiClient.post<{ success: boolean; data: any }>(
+      `/merchants/admin/${merchantId}/documents/${docId}/review?${query.toString()}`
     );
-    return res.data.data;
+    const data = res.data.data;
+    return {
+      ...data,
+      documentName: data.documentName || data.fileName,
+      createdAt: data.createdAt || data.uploadedAt,
+    };
   },
 
   getAuditLogs: async (merchantId: string): Promise<MerchantAuditLog[]> => {
@@ -174,3 +263,4 @@ export const adminMerchantApi = {
     return res.data.data;
   },
 };
+
