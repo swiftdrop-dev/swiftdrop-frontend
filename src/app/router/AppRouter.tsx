@@ -33,6 +33,10 @@ import AssignCourier from '../../features/dispatcher/pages/AssignCourier';
 import Reports from '../../features/dispatcher/pages/Reports';
 import DispatcherParcels from '../../features/dispatcher/pages/DispatcherParcels';
 
+// Admin Pricing & Estimates (Member 3)
+import AdminPricingPage from '../../features/admin/pages/AdminPricingPage';
+import FeeEstimateWidget from '../../features/customer/components/FeeEstimateWidget';
+
 import { ProtectedRoute } from '../../components/shared/SharedComponents';
 
 const RootRedirect: React.FC = () => {
@@ -52,11 +56,13 @@ export const AppRouter: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public */}
+        {/* Public Routes */}
         <Route path="/" element={<RootRedirect />} />
         <Route path="/track" element={<PublicTracking />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/pricing" element={<Navigate to="/admin/pricing" replace />} />
+        <Route path="/estimate" element={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'var(--bg-base)' }}><FeeEstimateWidget /></div>} />
 
         {/* Customer */}
         <Route path="/customer" element={<ProtectedRoute allowedRoles={['customer']}><CustomerDashboard /></ProtectedRoute>} />
@@ -81,9 +87,10 @@ export const AppRouter: React.FC = () => {
         <Route path="/dispatcher/assign" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><AssignCourier /></ProtectedRoute>} />
         <Route path="/dispatcher/reports" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><Reports /></ProtectedRoute>} />
 
-        {/* Admin Compliance & Verification */}
+        {/* Admin Compliance, Pricing & Verification */}
         <Route path="/admin/merchants" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><AdminMerchantReviewPage /></ProtectedRoute>} />
         <Route path="/admin/merchants/pending" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><AdminMerchantReviewPage /></ProtectedRoute>} />
+        <Route path="/admin/pricing" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><AdminPricingPage /></ProtectedRoute>} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
