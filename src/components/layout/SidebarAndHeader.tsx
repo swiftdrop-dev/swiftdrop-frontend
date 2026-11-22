@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Package, LayoutDashboard, PlusCircle, List, FileText,
   Truck, MapPin, CheckSquare, BarChart2, Users,
-  Settings, LogOut, Menu, X, Bell, ChevronDown,
+  Settings, LogOut, Menu, X, Bell, ChevronDown, DollarSign,
 } from 'lucide-react';
 import { useAuth } from '../../features/auth/context/AuthContext';
 import type { UserRole } from '../../types/global.types';
@@ -62,6 +62,7 @@ const NAV_BY_ROLE: Record<UserRole, { section: string; items: NavItem[] }[]> = {
         { to: '/dispatcher/parcels', icon: <Package size={18} />, label: 'All Parcels', badge: 5 },
         { to: '/dispatcher/assign', icon: <Users size={18} />, label: 'Assign Courier' },
         { to: '/admin/merchants', icon: <CheckSquare size={18} />, label: 'Merchant Review' },
+        { to: '/admin/pricing', icon: <DollarSign size={18} />, label: 'Pricing & Zones' },
         { to: '/dispatcher/reports', icon: <BarChart2 size={18} />, label: 'Reports' },
         { to: '/track', icon: <MapPin size={18} />, label: 'Track Parcel' },
       ],
@@ -72,6 +73,7 @@ const NAV_BY_ROLE: Record<UserRole, { section: string; items: NavItem[] }[]> = {
       section: 'Administration',
       items: [
         { to: '/admin/merchants', icon: <CheckSquare size={18} />, label: 'Merchant Review' },
+        { to: '/admin/pricing', icon: <DollarSign size={18} />, label: 'Pricing & Zones' },
         { to: '/dispatcher', icon: <LayoutDashboard size={18} />, label: 'Dispatch Console' },
         { to: '/track', icon: <MapPin size={18} />, label: 'Track Parcel' },
       ],
