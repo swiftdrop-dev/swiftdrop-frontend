@@ -1,4 +1,4 @@
-export type MerchantStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+export type MerchantStatus = 'DRAFT' | 'PENDING' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
 export type PricingTier = 'STANDARD' | 'SILVER' | 'GOLD' | 'ENTERPRISE';
 export type BusinessType =
   | 'SOLE_PROPRIETORSHIP'
@@ -114,9 +114,14 @@ export interface MerchantProfile {
   primaryContactName: string;
   primaryContactPhone: string;
   primaryContactEmail: string;
-  contactName?: string;
-  contactPhone?: string;
-  contactEmail?: string;
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string;
+  pickupStreet: string;
+  pickupCity: string;
+  pickupDistrict: string;
+  reviewReason?: string | null;
+  reviewedAt?: string | null;
   rejectionReason?: string;
   verifiedAt?: string;
   createdAt: string;
@@ -208,4 +213,50 @@ export interface PageResponse<T> {
   totalPages: number;
   size: number;
   number: number;
+}
+
+export interface MerchantProfileFields {
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  pickupStreet: string;
+  pickupCity: string;
+  pickupDistrict: string;
+}
+
+export interface MerchantOnboarding extends MerchantProfileFields {
+  businessName: string;
+  registrationNumber: string;
+}
+
+export type MerchantScope = 'orders:read' | 'orders:write';
+
+export interface ApiKeyMetadata {
+  id: string;
+  name: string;
+  publicId: string;
+  scopes: MerchantScope[];
+  createdAt: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  replacementId: string | null;
+  state: 'ACTIVE' | 'EXPIRED' | 'REVOKED';
+}
+
+export interface ApiKeyIssue {
+  name: string;
+  scopes: MerchantScope[];
+  expiresAt?: string;
+}
+
+export interface ApiKeyIssued {
+  credential: ApiKeyMetadata;
+  apiKey: string;
+}
+
+export interface Page<T> {
+  data: T[];
+  total: number;
+  page: number;
+  size: number;
 }

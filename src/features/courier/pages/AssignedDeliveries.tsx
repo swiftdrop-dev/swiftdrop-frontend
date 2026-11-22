@@ -1,190 +1,192 @@
-import React, { useState } from 'react';
-import { MapPin, Phone, Package, CheckCircle, Truck, ArrowRight } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import {
+  AlertCircle, ArrowLeft, ArrowRight, CalendarDays, MapPin, Package,
+  Phone, Search, Truck, UserRound,
+} from 'lucide-react';
 import DashboardLayout from '../../../components/layout/DashboardLayout';
-import { StatusBadge, Modal, useToast } from '../../../components/shared/SharedComponents';
-import { MOCK_PARCELS } from '../../../lib/mockData';
-import type { Parcel, ParcelStatus } from '../../../types/global.types';
+import { EmptyState, Modal, StatusBadge } from '../../../components/shared/SharedComponents';
+import type { ParcelStatus } from '../../../types/global.types';
+import { courierDeliveriesApi } from '../api/deliveries.api';
+import type { AssignedDelivery } from '../types/delivery.types';
+import './AssignedDeliveries.css';
 
-const STATUS_FLOW: ParcelStatus[] = ['assigned', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered'];
-const STATUS_LABELS: Record<string, string> = {
-  assigned: 'Mark as Picked Up',
-  picked_up: 'Mark In Transit',
-  in_transit: 'Out for Delivery',
-  out_for_delivery: 'Mark as Delivered',
+const PAGE_SIZE = 20;
+const KNOWN_STATUSES: ParcelStatus[] = [
+  'pending', 'assigned', 'picked_up', 'in_transit', 'out_for_delivery',
+  'delivered', 'failed', 'cancelled', 'returned',
+];
+
+const formatStatus = (status: string) => status.replaceAll('_', ' ').replace(/\b\w/g, character => character.toUpperCase());
+const formatDate = (value: string | null | undefined) => {
+  if (!value) return 'Not scheduled';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('en-LK', { dateStyle: 'medium', timeStyle: 'short' });
 };
+const formatScheduledDate = (value: string | null | undefined) => {
+  if (!value) return 'Not scheduled';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-LK', { dateStyle: 'medium' });
+};
+const isKnownStatus = (status: string): status is ParcelStatus => KNOWN_STATUSES.includes(status as ParcelStatus);
 
 const AssignedDeliveries: React.FC = () => {
-  const { showToast } = useToast();
-  const [parcels, setParcels] = useState<Parcel[]>(
-    MOCK_PARCELS.filter(p => p.courierId === 'cou_001' && p.status !== 'delivered' && p.status !== 'cancelled') as Parcel[]
-  );
-  const [selected, setSelected] = useState<Parcel | null>(null);
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedDelivery, setSelectedDelivery] = useState<AssignedDelivery | null>(null);
+  const { data, isPending, isError, isFetching, refetch } = useQuery({
+    queryKey: ['courier', 'assigned-deliveries', page, PAGE_SIZE],
+    queryFn: () => courierDeliveriesApi.getAssignedDeliveries({ page, size: PAGE_SIZE }),
+  });
 
-  const nextStatus = (current: ParcelStatus): ParcelStatus | null => {
-    const idx = STATUS_FLOW.indexOf(current);
-    return idx < STATUS_FLOW.length - 1 ? STATUS_FLOW[idx + 1] : null;
+  const statusUpdate = useMutation({
+    mutationFn: (input: { parcelId: string; status: 'in_transit' | 'failed'; failureReason?: string }) =>
+      courierDeliveriesApi.updateParcelStatus(input.parcelId, { status: input.status, failureReason: input.failureReason }),
+  });
+  const [failureReason, setFailureReason] = useState('');
+  const [statusUpdateError, setStatusUpdateError] = useState<string | null>(null);
+  const deliveries = useMemo(() => data?.content ?? [], [data?.content]);
+  const availableStatuses = [...new Set(deliveries.map(delivery => delivery.status))];
+  const visibleDeliveries = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    return deliveries.filter(delivery => {
+      const matchesStatus = statusFilter === 'all' || delivery.status === statusFilter;
+      const matchesSearch = !normalizedSearch
+        || delivery.parcelId.toLowerCase().includes(normalizedSearch)
+        || (delivery.trackingNumber ?? '').toLowerCase().includes(normalizedSearch)
+        || (delivery.recipientName ?? '').toLowerCase().includes(normalizedSearch);
+      return matchesStatus && matchesSearch;
+    });
+  }, [deliveries, search, statusFilter]);
+
+  const nextStatus = selectedDelivery?.status === 'pending' || selectedDelivery?.status === 'failed'
+    ? 'in_transit' : selectedDelivery?.status === 'in_transit' ? 'failed' : null;
+
+  const updateStatus = async () => {
+    if (!selectedDelivery || !nextStatus || (nextStatus === 'failed' && !failureReason.trim())) return;
+    setStatusUpdateError(null);
+    try {
+      const result = await statusUpdate.mutateAsync({
+        parcelId: selectedDelivery.parcelId, status: nextStatus,
+        ...(nextStatus === 'failed' ? { failureReason: failureReason.trim() } : {}),
+      });
+      setSelectedDelivery(current => current ? { ...current, status: result.status } : current);
+      setFailureReason('');
+      await queryClient.invalidateQueries({ queryKey: ['courier', 'assigned-deliveries'] });
+    } catch (error) {
+      setStatusUpdateError(error instanceof Error ? error.message : 'Could not update parcel status. Please retry.');
+    }
   };
 
-  const updateStatus = (parcelId: string, newStatus: ParcelStatus) => {
-    const event = { status: newStatus, timestamp: new Date().toISOString(), note: `Status updated by courier` };
-
-    setParcels(ps => ps.map(p => {
-      if (p.id === parcelId) {
-        const updated = {
-          ...p,
-          status: newStatus,
-          statusHistory: [...p.statusHistory, event],
-          ...(newStatus === 'delivered' ? { deliveredAt: new Date().toISOString() } : {}),
-        };
-        // sync to global mock
-        const globalIdx = MOCK_PARCELS.findIndex(gp => gp.id === parcelId);
-        if (globalIdx !== -1) MOCK_PARCELS[globalIdx] = updated as any;
-        return updated;
-      }
-      return p;
-    }));
-
-    showToast(`Status updated to "${newStatus.replace('_', ' ')}"`, 'success');
-    setSelected(null);
+  const clearFilters = () => {
+    setSearch('');
+    setStatusFilter('all');
   };
 
   return (
     <DashboardLayout>
-      <div className="page-header">
-        <h1 className="page-title">My Deliveries</h1>
-        <p className="page-subtitle">Update delivery statuses and manage your route</p>
+      <div className="page-header deliveries-heading">
+        <div>
+          <h1 className="page-title">Assigned Deliveries</h1>
+          <p className="page-subtitle">Deliveries currently assigned to your courier profile</p>
+        </div>
+        <Link to="/courier" className="btn btn-secondary deliveries-back"><ArrowLeft size={16} /> Dashboard</Link>
       </div>
 
-      {parcels.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 80, color: 'var(--text-muted)' }}>
-          <div style={{ width: 72, height: 72, margin: '0 auto 20px', display: 'grid', placeItems: 'center', background: 'var(--grad)', color: 'var(--signal)', borderRadius: 12 }}><CheckCircle size={32} /></div>
-          <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>All clear!</h3>
-          <p>You have no active deliveries right now.</p>
+      <section className="stats-grid deliveries-stats" aria-label="Delivery summary">
+        <div className="stat-card primary"><div className="stat-icon primary"><Package size={20} /></div><div className="stat-value">{data?.content.length ?? '—'}</div><div className="stat-label">On this page</div></div>
+        <div className="stat-card info"><div className="stat-icon info"><Truck size={20} /></div><div className="stat-value">{data ? (data.hasNext ? 'More' : 'Current') : '—'}</div><div className="stat-label">Assignment list</div></div>
+      </section>
+
+      <section className="card deliveries-list-card" aria-label="Assigned delivery list">
+        <div className="deliveries-list-heading">
+          <div><h2 className="card-title">Your delivery queue</h2><p className="deliveries-muted">Recipient and assignment details from Parcel Service</p></div>
+          {data && <span className="deliveries-count">{data.content.length} on this page</span>}
         </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {parcels.map((parcel, i) => {
-            const next = nextStatus(parcel.status);
-            return (
-              <div
-                key={parcel.id}
-                className="card animate-fade-in"
-                style={{ animationDelay: `${i * 80}ms`, borderLeft: parcel.fragile ? '3px solid var(--warning)' : undefined }}
-              >
-                <div className="card-body">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: 'var(--primary-light)' }}>
-                          {parcel.trackingNumber}
-                        </span>
-                        <StatusBadge status={parcel.status} />
-                        {parcel.fragile && (
-                          <span style={{
-                            background: 'var(--warning-bg)', color: 'var(--warning)',
-                            fontSize: 11, padding: '2px 8px', borderRadius: 99, border: '1px solid var(--warning-border)', fontWeight: 600,
-                          }}>
-                            FRAGILE
-                          </span>
-                        )}
-                      </div>
+        <div className="deliveries-toolbar">
+          <label className="deliveries-search">
+            <Search size={17} aria-hidden="true" />
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search parcel ID, tracking number or recipient" aria-label="Search parcel ID, tracking number or recipient" />
+          </label>
+          <label className="deliveries-filter-label"><span>Status</span>
+            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label="Filter by status">
+              <option value="all">All statuses</option>
+              {availableStatuses.map(status => <option key={status} value={status}>{formatStatus(status)}</option>)}
+            </select>
+          </label>
+        </div>
+        <p className="deliveries-details-note">Search and status filters apply to the loaded page. Pickup details are not part of the current API response.</p>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
-                        <div>
-                          <p style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Recipient</p>
-                          <p style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>{parcel.recipientName}</p>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-secondary)' }}>
-                            <Phone size={12} /> {parcel.recipientPhone}
-                          </div>
-                        </div>
-                        <div>
-                          <p style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Drop Address</p>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 13, color: 'var(--text-secondary)' }}>
-                            <MapPin size={13} style={{ marginTop: 2, color: 'var(--primary-light)', flexShrink: 0 }} />
-                            <span>{parcel.recipientAddress.street},<br />{parcel.recipientAddress.city}, {parcel.recipientAddress.district}</span>
-                          </div>
-                        </div>
-                        <div>
-                          <p style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Package</p>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-secondary)' }}>
-                            <Package size={12} /> {parcel.description}
-                          </div>
-                          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{parcel.size.toUpperCase()} · {parcel.weight}kg</p>
-                        </div>
-                        <div>
-                          <p style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Payment</p>
-                          <span className={`badge ${parcel.paymentMethod === 'cod' ? 'badge-warning' : 'badge-delivered'}`} style={{ fontSize: 12 }}>
-                            {parcel.paymentMethod === 'cod' ? 'Collect COD' : 'Online Paid'}
-                          </span>
-                          <p style={{ fontWeight: 700, color: 'var(--text-primary)', marginTop: 4 }}>Rs. {parcel.totalFee.toLocaleString()}</p>
-                        </div>
-                      </div>
-
-                      {parcel.specialInstructions && (
-                        <div style={{
-                          marginTop: 14, padding: '8px 12px', background: 'var(--warning-bg)',
-                          border: '1px solid var(--warning-border)', borderRadius: 10,
-                          fontSize: 13, color: 'var(--warning)',
-                        }}>
-                          {parcel.specialInstructions}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 160 }}>
-                      {next && (
-                        <button
-                          className={`btn btn-${next === 'delivered' ? 'success' : 'primary'}`}
-                          onClick={() => setSelected(parcel)}
-                        >
-                          {next === 'delivered' ? <CheckCircle size={16} /> : <Truck size={16} />}
-                          {STATUS_LABELS[parcel.status] ?? 'Update'}
-                        </button>
-                      )}
-                      {parcel.status === 'out_for_delivery' && (
-                        <a href="/courier/proof" className="btn btn-secondary btn-sm">
-                          Add Proof
-                        </a>
-                      )}
-                    </div>
-                  </div>
+        {isPending ? (
+          <div className="delivery-skeletons" role="status" aria-label="Loading assigned deliveries">
+            {[0, 1, 2].map(row => <div className="delivery-skeleton" key={row}><span /><span /><span /></div>)}
+          </div>
+        ) : isError ? (
+          <EmptyState icon={<AlertCircle size={27} strokeWidth={1.5} />} title="Couldn't load assigned deliveries" description="Check your connection and try again. Your courier identity is resolved by the authenticated backend session." action={<button className="btn btn-primary" onClick={() => void refetch()} disabled={isFetching}>{isFetching ? 'Retrying…' : 'Retry'}</button>} />
+        ) : deliveries.length === 0 ? (
+          <EmptyState icon={<Package size={27} strokeWidth={1.5} />} title="No assigned deliveries" description="Deliveries assigned to your courier profile will appear here." />
+        ) : visibleDeliveries.length === 0 ? (
+          <EmptyState icon={<Search size={27} strokeWidth={1.5} />} title="No matching deliveries" description="Try a different parcel, recipient or status filter." action={<button className="btn btn-secondary" onClick={clearFilters}>Clear filters</button>} />
+        ) : (
+          <div className="assigned-delivery-list">
+            {visibleDeliveries.map(delivery => (
+              <article className="assigned-delivery-card" key={delivery.assignmentId}>
+                <div className="assigned-delivery-card-header">
+                  <div><strong className="assigned-delivery-tracking">{delivery.trackingNumber || delivery.parcelId}</strong><span className="assigned-delivery-parcel-id">Parcel {delivery.parcelId}</span></div>
+                  {isKnownStatus(delivery.status) ? <StatusBadge status={delivery.status} /> : <span className="badge badge-assigned">{formatStatus(delivery.status)}</span>}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Confirm Modal */}
-      <Modal
-        isOpen={!!selected}
-        onClose={() => setSelected(null)}
-        title="Confirm Status Update"
-        footer={
-          <>
-            <button className="btn btn-secondary" onClick={() => setSelected(null)}>Cancel</button>
-            <button
-              className="btn btn-primary"
-              onClick={() => selected && nextStatus(selected.status) && updateStatus(selected.id, nextStatus(selected.status)!)}
-            >
-              <ArrowRight size={16} /> Confirm Update
-            </button>
-          </>
-        }
-      >
-        {selected && (
-          <div>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>
-              Update status for <strong style={{ color: 'var(--text-primary)' }}>{selected.trackingNumber}</strong>?
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'center', fontSize: 14, fontWeight: 600 }}>
-              <StatusBadge status={selected.status} />
-              <ArrowRight size={16} color="var(--text-muted)" />
-              {nextStatus(selected.status) && <StatusBadge status={nextStatus(selected.status)!} />}
-            </div>
+                <div className="assigned-delivery-details">
+                  <div><span><UserRound size={14} /> Recipient</span><strong>{delivery.recipientName || 'Unavailable'}</strong>{delivery.recipientPhone && <a href={`tel:${delivery.recipientPhone}`}><Phone size={13} /> {delivery.recipientPhone}</a>}</div>
+                  <div><span><MapPin size={14} /> Delivery address</span><strong>{delivery.deliveryAddress || 'Unavailable'}</strong></div>
+                  <div><span><CalendarDays size={14} /> Assigned</span><strong>{formatDate(delivery.assignedAt)}</strong></div>
+                  <div><span><CalendarDays size={14} /> Scheduled</span><strong>{formatScheduledDate(delivery.scheduledDate)}</strong></div>
+                </div>
+                <div className="assigned-delivery-card-footer"><span>Assignment #{delivery.assignmentId}</span><button className="btn btn-secondary btn-sm" onClick={() => setSelectedDelivery(delivery)}>View details <ArrowRight size={15} /></button></div>
+              </article>
+            ))}
           </div>
         )}
+        {data && deliveries.length > 0 && <nav className="deliveries-pagination" aria-label="Assigned delivery pages">
+          <span>Page {data.page + 1}{isFetching ? ' · Updating' : ''}</span>
+          <div>
+            <button className="btn btn-secondary btn-sm" onClick={() => setPage(current => Math.max(0, current - 1))} disabled={page === 0 || isFetching}><ArrowLeft size={15} /> Previous</button>
+            <button className="btn btn-primary btn-sm" onClick={() => setPage(current => current + 1)} disabled={!data.hasNext || isFetching}>Next <ArrowRight size={15} /></button>
+          </div>
+        </nav>}
+      </section>
+
+      <Modal isOpen={!!selectedDelivery} onClose={() => setSelectedDelivery(null)} title="Delivery details" size="md">
+        {selectedDelivery && <div className="courier-detail-modal">
+          <div className="courier-detail-modal-heading"><strong>{selectedDelivery.trackingNumber || selectedDelivery.parcelId}</strong>{isKnownStatus(selectedDelivery.status) ? <StatusBadge status={selectedDelivery.status} /> : <span className="badge badge-assigned">{formatStatus(selectedDelivery.status)}</span>}</div>
+          <dl>
+            <div><dt>Parcel ID</dt><dd>{selectedDelivery.parcelId}</dd></div>
+            <div><dt>Assignment ID</dt><dd>{selectedDelivery.assignmentId}</dd></div>
+            <div><dt>Recipient</dt><dd>{selectedDelivery.recipientName || 'Unavailable'}</dd></div>
+            <div><dt>Phone</dt><dd>{selectedDelivery.recipientPhone || 'Unavailable'}</dd></div>
+            <div><dt>Delivery address</dt><dd>{selectedDelivery.deliveryAddress || 'Unavailable'}</dd></div>
+            <div><dt>Scheduled date</dt><dd>{formatScheduledDate(selectedDelivery.scheduledDate)}</dd></div>
+            <div><dt>Assigned at</dt><dd>{formatDate(selectedDelivery.assignedAt)}</dd></div>
+            <div><dt>Pickup address</dt><dd>Not provided by the current Parcel Service API</dd></div>
+          </dl>
+          {nextStatus && <div className="courier-status-actions">
+            <h3>Update delivery status</h3>
+            {nextStatus === 'failed' && <label className="form-group">
+              <span className="form-label">Failure reason</span>
+              <textarea className="form-input" rows={3} maxLength={1000} value={failureReason}
+                onChange={event => setFailureReason(event.target.value)} placeholder="Explain why delivery could not be completed" />
+            </label>}
+            {statusUpdateError && <p role="alert" className="text-danger">{statusUpdateError}</p>}
+            <button className="btn btn-primary" type="button" onClick={() => void updateStatus()}
+              disabled={statusUpdate.isPending || (nextStatus === 'failed' && !failureReason.trim())}>
+              {statusUpdate.isPending ? 'Updating…' : nextStatus === 'failed' ? 'Report failed delivery'
+                : selectedDelivery.status === 'failed' ? 'Retry delivery' : 'Start delivery'}
+            </button>
+            <p className="deliveries-muted">Parcel Service validates status transitions. Delivery completion still requires both proofs.</p>
+          </div>}
+        </div>}
       </Modal>
     </DashboardLayout>
   );

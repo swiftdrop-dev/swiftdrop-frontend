@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Package, LayoutDashboard, PlusCircle, List, FileText,
   Truck, MapPin, CheckSquare, BarChart2, Users,
@@ -32,9 +32,12 @@ const NAV_BY_ROLE: Record<UserRole, { section: string; items: NavItem[] }[]> = {
       section: 'Main',
       items: [
         { to: '/merchant', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
-        { to: '/merchant/onboarding', icon: <FileText size={18} />, label: 'Onboarding' },
-        { to: '/merchant/book', icon: <PlusCircle size={18} />, label: 'New Booking' },
-        { to: '/merchant/bulk', icon: <FileText size={18} />, label: 'Bulk Booking' },
+        { to: '/merchant/orders/new', icon: <PlusCircle size={18} />, label: 'New Order' },
+        { to: '/merchant/bulk', icon: <FileText size={18} />, label: 'Bulk Booking Demo' },
+        { to: '/merchant/orders', icon: <List size={18} />, label: 'Orders' },
+        { to: '/merchant/onboarding', icon: <CheckSquare size={18} />, label: 'Onboarding' },
+        { to: '/merchant/profile', icon: <Users size={18} />, label: 'Business Profile' },
+        { to: '/merchant/api-keys', icon: <Settings size={18} />, label: 'API Keys' },
         { to: '/merchant/parcels', icon: <List size={18} />, label: 'All Shipments' },
         { to: '/track', icon: <MapPin size={18} />, label: 'Track Parcel' },
       ],
@@ -45,7 +48,7 @@ const NAV_BY_ROLE: Record<UserRole, { section: string; items: NavItem[] }[]> = {
       section: 'Deliveries',
       items: [
         { to: '/courier', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
-        { to: '/courier/deliveries', icon: <Truck size={18} />, label: 'My Deliveries', badge: 3 },
+        { to: '/courier/deliveries', icon: <Truck size={18} />, label: 'My Deliveries' },
         { to: '/courier/proof', icon: <CheckSquare size={18} />, label: 'Proof of Delivery' },
         { to: '/track', icon: <MapPin size={18} />, label: 'Track Parcel' },
       ],
@@ -86,6 +89,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   if (!user) return null;
 
@@ -138,7 +142,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   key={item.to}
                   to={item.to}
                   end={item.to === '/customer' || item.to === '/merchant' || item.to === '/courier' || item.to === '/dispatcher'}
-                  className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
+                  className={({ isActive }) => `sidebar-item ${isActive && !(item.to === '/merchant/orders' && pathname.replace(/\/+$/, '') === '/merchant/orders/new') ? 'active' : ''}`}
+                  aria-current={item.to === '/merchant/orders' && pathname.replace(/\/+$/, '') === '/merchant/orders/new' ? false : undefined}
                   onClick={onClose}
                 >
                   {item.icon}

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import type { User, UserRole } from '../../../types/global.types';
-import { authService } from '../../../services/auth.service';
+import type { User } from '../../../types/global.types';
+import { authService, type RegisterData } from '../../../services/auth.service';
 import axios from 'axios';
 
 interface AuthContextType {
@@ -11,22 +11,20 @@ interface AuthContextType {
   register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
 }
 
-interface RegisterData {
-  name: string;
-  email: string;
-  password: string;
-  role: UserRole;
-  phone?: string;
-}
-
 const AuthContext = createContext<AuthContextType | null>(null);
 
 /** Reads and parses the stored user from localStorage on startup. */
 function loadStoredUser(): User | null {
   try {
+    const token = localStorage.getItem('swiftdrop_token');
     const stored = localStorage.getItem('swiftdrop_user');
-    return stored ? (JSON.parse(stored) as User) : null;
+    if (!token || !stored) {
+      authService.logout();
+      return null;
+    }
+    return JSON.parse(stored) as User;
   } catch {
+    authService.logout();
     return null;
   }
 }
@@ -34,8 +32,13 @@ function loadStoredUser(): User | null {
 /** Extracts a human-readable message from an Axios error response. */
 function extractErrorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError(error)) {
-    const data = error.response?.data as { message?: string } | undefined;
-    return data?.message ?? fallback;
+    const data = error.response?.data as { message?: unknown } | undefined;
+    if (typeof data?.message === 'string' && data.message.trim()) {
+      return data.message;
+    }
+    if (!error.response) {
+      return 'Unable to reach the authentication service. Check your connection and try again.';
+    }
   }
   return fallback;
 }

@@ -13,7 +13,6 @@ export interface RegisterData {
   email: string;
   password: string;
   phone?: string;
-  role: UserRole;
 }
 
 export interface AuthApiResponse {
@@ -33,7 +32,13 @@ export const authService = {
   },
 
   register: async (data: RegisterData): Promise<AuthApiResponse> => {
-    const response = await apiClient.post<AuthApiResponse>('/auth/register', data);
+    const payload: RegisterData = {
+      name: data.name,
+      email: data.email,
+      password: data.password,
+      ...(data.phone?.trim() ? { phone: data.phone.trim() } : {}),
+    };
+    const response = await apiClient.post<AuthApiResponse>('/auth/register', payload);
     return response.data;
   },
 

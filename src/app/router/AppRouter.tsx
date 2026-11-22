@@ -17,9 +17,9 @@ import MyParcels from '../../features/customer/pages/MyParcels';
 
 // Merchant
 import MerchantDashboard from '../../features/merchant/pages/MerchantDashboard';
-import MerchantOnboardingPage from '../../features/merchant/pages/MerchantOnboardingPage';
 import BulkBooking from '../../features/merchant/pages/BulkBooking';
 import MerchantParcels from '../../features/merchant/pages/MerchantParcels';
+import { MerchantModuleBoundary, MerchantOnboarding, MerchantProfile, MerchantApiKeys, MerchantOrderCreate, MerchantOrders, MerchantOrderDetail } from '../../features/merchant';
 import AdminMerchantReviewPage from '../../features/merchant/pages/AdminMerchantReviewPage';
 
 // Courier
@@ -70,9 +70,14 @@ export const AppRouter: React.FC = () => {
         <Route path="/customer/parcels" element={<ProtectedRoute allowedRoles={['customer']}><MyParcels /></ProtectedRoute>} />
 
         {/* Merchant */}
-        <Route path="/merchant" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantDashboard /></ProtectedRoute>} />
-        <Route path="/merchant/onboarding" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantOnboardingPage /></ProtectedRoute>} />
-        <Route path="/merchant/book" element={<ProtectedRoute allowedRoles={['merchant']}><BookParcel /></ProtectedRoute>} />
+        <Route path="/merchant" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantDashboard /></MerchantModuleBoundary></ProtectedRoute>} />
+        <Route path="/merchant/book" element={<ProtectedRoute allowedRoles={['merchant']}><Navigate to="/merchant/orders/new" replace /></ProtectedRoute>} />
+        <Route path="/merchant/onboarding" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantOnboarding /></MerchantModuleBoundary></ProtectedRoute>} />
+        <Route path="/merchant/profile" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantProfile /></MerchantModuleBoundary></ProtectedRoute>} />
+        <Route path="/merchant/api-keys" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantApiKeys /></MerchantModuleBoundary></ProtectedRoute>} />
+        <Route path="/merchant/orders/new" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantOrderCreate /></MerchantModuleBoundary></ProtectedRoute>} />
+        <Route path="/merchant/orders" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantOrders /></MerchantModuleBoundary></ProtectedRoute>} />
+        <Route path="/merchant/orders/:id" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantOrderDetail /></MerchantModuleBoundary></ProtectedRoute>} />
         <Route path="/merchant/bulk" element={<ProtectedRoute allowedRoles={['merchant']}><BulkBooking /></ProtectedRoute>} />
         <Route path="/merchant/parcels" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantParcels /></ProtectedRoute>} />
 
