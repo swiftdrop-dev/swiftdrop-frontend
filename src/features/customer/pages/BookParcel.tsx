@@ -18,10 +18,9 @@ import {
 import DashboardLayout from "../../../components/layout/DashboardLayout";
 import { useToast } from "../../../components/shared/SharedComponents";
 import { useAuth } from "../../auth/context/AuthContext";
-import { saveParcel } from "../services/parcel-store";
+import { customerParcelApi } from "../services/customer-parcel.api";
 
 import type {
-  Parcel,
   ParcelSize,
 } from "../../../types/global.types";
 
@@ -93,63 +92,6 @@ const DISTRICTS = [
   "Kegalle",
 ];
 
-function calcFee(
-  weight: number,
-  size: ParcelSize,
-  fragile: boolean,
-  toDistrict: string,
-) {
-  const baseMap: Record<ParcelSize, number> = {
-    xs: 150,
-    sm: 250,
-    md: 350,
-    lg: 550,
-    xl: 850,
-  };
-
-  const farDistricts = [
-    "Jaffna",
-    "Kilinochchi",
-    "Mannar",
-    "Vavuniya",
-    "Mullaitivu",
-    "Hambantota",
-    "Batticaloa",
-    "Trincomalee",
-    "Ampara",
-  ];
-
-  const base = baseMap[size];
-
-  const validWeight =
-    Number.isFinite(weight) && weight > 0 ? weight : 0;
-
-  const weightFee = Math.ceil(validWeight) * 50;
-
-  const distanceFee = farDistricts.includes(toDistrict)
-    ? 300
-    : toDistrict === "Colombo"
-      ? 0
-      : 100;
-
-  const fragileFee = fragile ? 75 : 0;
-
-  const days = farDistricts.includes(toDistrict)
-    ? 3
-    : toDistrict === "Colombo"
-      ? 1
-      : 2;
-
-  return {
-    base,
-    weight: weightFee,
-    distance: distanceFee,
-    fragile: fragileFee,
-    total: base + weightFee + distanceFee + fragileFee,
-    days,
-  };
-}
-
 const BookParcel: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -179,13 +121,6 @@ const BookParcel: React.FC = () => {
     paymentMethod: "cod" as "cod" | "online",
   });
 
-  const fee = calcFee(
-    form.weight,
-    form.size,
-    form.fragile,
-    form.deliveryDistrict,
-  );
-
   function update<K extends keyof typeof form>(
     key: K,
     value: (typeof form)[K],
@@ -209,80 +144,32 @@ const BookParcel: React.FC = () => {
     setError("");
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const pickupAddress = [form.pickupStreet, form.pickupCity, form.pickupDistrict]
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .join(", ");
 
-      const createdAt = new Date().toISOString();
+      const recipientAddress = [form.deliveryStreet, form.deliveryCity, form.deliveryDistrict]
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .join(", ");
 
-      const newParcel: Parcel = {
-        id: crypto.randomUUID(),
-
-        trackingNumber: `SWF-${new Date().getFullYear()}-${crypto
-          .randomUUID()
-          .replaceAll("-", "")
-          .slice(0, 12)
-          .toUpperCase()}`,
-
-        status: "pending",
-
-        senderId: user.id,
-        senderName: user.name,
-        senderPhone: user.phone ?? "",
-        senderType:
-          user.role === "merchant" ? "merchant" : "customer",
-
+      const bookingReq = {
         recipientName: form.recipientName.trim(),
         recipientPhone: form.recipientPhone.replace(/[-\s]/g, "").trim(),
-
-        recipientAddress: {
-          street: form.deliveryStreet.trim(),
-          city: form.deliveryCity.trim(),
-          district: form.deliveryDistrict,
-        },
-
-        pickupAddress: {
-          street: form.pickupStreet.trim(),
-          city: form.pickupCity.trim(),
-          district: form.pickupDistrict,
-        },
-
-        description: form.description.trim(),
-        weight: form.weight,
-        size: form.size,
-
-        declaredValue: form.declaredValue
-          ? Number(form.declaredValue)
-          : undefined,
-
+        recipientAddress,
+        pickupAddress,
+        description: form.description.trim() || undefined,
+        weightKg: Number(form.weight) || 1.0,
+        parcelSize: form.size.toUpperCase(),
         fragile: form.fragile,
-        specialInstructions: form.specialInstructions.trim(),
-
-        deliveryFee: fee.total,
-        totalFee: fee.total,
-
-        paymentStatus: "pending",
-        paymentMethod: form.paymentMethod,
-
-        createdAt,
-
-        estimatedDeliveryDate: new Date(
-          Date.now() + fee.days * 86400000,
-        )
-          .toISOString()
-          .slice(0, 10),
-
-        statusHistory: [
-          {
-            status: "pending",
-            timestamp: createdAt,
-            note: "Booking confirmed",
-          },
-        ],
+        paymentMethod: form.paymentMethod.toUpperCase(),
       };
 
-      saveParcel(newParcel);
+      const booked = await customerParcelApi.bookParcel(bookingReq);
 
       showToast(
-        `Parcel booked successfully! ${newParcel.trackingNumber}`,
+        `Parcel booked successfully! Tracking: ${booked.trackingNumber}`,
         "success",
       );
 
@@ -292,13 +179,15 @@ const BookParcel: React.FC = () => {
           : "/customer/parcels",
         {
           state: {
-            bookedTracking: newParcel.trackingNumber,
+            bookedTracking: booked.trackingNumber,
           },
         },
       );
-    } catch {
+    } catch (err: any) {
       setError(
-        "Your booking could not be saved. Check browser storage and try again.",
+        err.response?.data?.message ||
+          err.message ||
+          "Your booking could not be saved. Please try again.",
       );
     } finally {
       submittingRef.current = false;
@@ -1311,36 +1200,24 @@ const BookParcel: React.FC = () => {
               Fee Estimate
             </p>
 
-            <p className="customer-note">
-              Demo pricing. Final rates will come from the
-              pricing API. Online payments are simulated.
+            <p className="customer-note" style={{ marginBottom: 16 }}>
+              Fee calculated upon pricing service availability.
             </p>
-
-            <div className="fee-row">
-              <span>Base rate ({form.size.toUpperCase()})</span>
-              <span>Rs. {fee.base}</span>
-            </div>
-
-            <div className="fee-row">
-              <span>Weight ({form.weight}kg)</span>
-              <span>Rs. {fee.weight}</span>
-            </div>
-
-            <div className="fee-row">
-              <span>Distance ({form.deliveryDistrict})</span>
-              <span>Rs. {fee.distance}</span>
-            </div>
-
-            {form.fragile && (
-              <div className="fee-row">
-                <span>Fragile handling</span>
-                <span>Rs. {fee.fragile}</span>
-              </div>
-            )}
 
             <div className="fee-row-total">
               <span>Total Fee</span>
-              <span>Rs. {fee.total.toLocaleString()}</span>
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "#d97706",
+                  background: "#fef3c7",
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                }}
+              >
+                Pending Pricing Service
+              </span>
             </div>
 
             <div
@@ -1355,10 +1232,7 @@ const BookParcel: React.FC = () => {
                 fontWeight: 500,
               }}
             >
-              Est. delivery in{" "}
-              <strong>
-                {fee.days} {fee.days === 1 ? "day" : "days"}
-              </strong>
+              Est. delivery in <strong>1–3 days</strong>
             </div>
           </div>
         </div>
