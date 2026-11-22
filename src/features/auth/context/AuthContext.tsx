@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import type { User } from '../../../types/global.types';
+import type { User, UserRole } from '../../../types/global.types';
 import { authService, type RegisterData } from '../../../services/auth.service';
 import axios from 'axios';
 
@@ -126,7 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: `demo_${Date.now()}`,
         email: formData.email,
         name: formData.name,
-        role: formData.role,
+        role: (formData as { role?: UserRole }).role ?? 'customer',
       };
       localStorage.setItem('swiftdrop_token', 'demo_jwt_token');
       localStorage.setItem('swiftdrop_user', JSON.stringify(newUser));
