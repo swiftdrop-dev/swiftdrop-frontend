@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   Package,
@@ -19,18 +19,90 @@ import {
 } from "../../../components/shared/SharedComponents";
 
 import { useAuth } from "../../auth/context/AuthContext";
-import { useParcels } from "../services/parcel-store";
+import { customerParcelApi, type ParcelBookingResponse } from "../services/customer-parcel.api";
+import type { Parcel, ParcelStatus, ParcelSize, Address } from "../../../types/global.types";
+
+function parseAddress(addrStr?: string): Address {
+  if (!addrStr) return { street: "", city: "", district: "" };
+  const parts = addrStr.split(",").map((p) => p.trim());
+  return {
+    street: parts[0] || "",
+    city: parts[1] || "",
+    district: parts[2] || "",
+  };
+}
+
+function mapStatus(backendStatus: string): ParcelStatus {
+  const s = backendStatus.toLowerCase();
+  if (s === "created") return "pending";
+  if (s === "assigned") return "assigned";
+  if (s === "picked_up" || s === "pickedup") return "picked_up";
+  if (s === "in_transit") return "in_transit";
+  if (s === "out_for_delivery") return "out_for_delivery";
+  if (s === "delivered") return "delivered";
+  if (s === "failed") return "failed";
+  if (s === "cancelled") return "cancelled";
+  if (s === "returned") return "returned";
+  return "pending";
+}
+
+function mapResponseToParcel(item: ParcelBookingResponse): Parcel {
+  const status = mapStatus(item.status);
+  return {
+    id: item.id,
+    trackingNumber: item.trackingNumber,
+    status,
+    senderId: item.senderId,
+    senderName: item.senderName || "",
+    senderPhone: item.senderPhone || "",
+    senderType: "customer",
+    recipientName: item.recipientName,
+    recipientPhone: item.recipientPhone,
+    recipientAddress: parseAddress(item.recipientAddress),
+    pickupAddress: parseAddress(item.pickupAddress),
+    description: item.description || "",
+    weight: item.weightKg || 1,
+    size: (item.parcelSize?.toLowerCase() || "sm") as ParcelSize,
+    fragile: !!item.fragile,
+    deliveryFee: item.totalFee || 0,
+    totalFee: item.totalFee || 0,
+    paymentStatus: (item.paymentStatus?.toLowerCase() || "pending") as "pending" | "paid" | "refunded",
+    paymentMethod: (item.paymentMethod?.toLowerCase() || "cod") as "cod" | "online",
+    courierId: item.courierId || undefined,
+    estimatedDeliveryDate: item.estimatedDeliveryDate || undefined,
+    createdAt: item.createdAt || new Date().toISOString(),
+    statusHistory: [
+      {
+        status,
+        timestamp: item.createdAt || new Date().toISOString(),
+        note: `Current status: ${item.status}`,
+      },
+    ],
+  };
+}
 
 const CustomerDashboard: React.FC = () => {
   const { user } = useAuth();
-  const parcels = useParcels();
+  const [myParcels, setMyParcels] = useState<Parcel[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const myParcels = parcels
-    .filter((parcel) => parcel.senderId === user?.id)
-    .sort(
-      (a, b) =>
-        Date.parse(b.createdAt) - Date.parse(a.createdAt),
-    );
+  const fetchParcels = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await customerParcelApi.getMyParcels({ size: 20 });
+      if (res && Array.isArray(res.content)) {
+        setMyParcels(res.content.map(mapResponseToParcel));
+      }
+    } catch (err) {
+      console.error("Failed to load customer dashboard parcels:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchParcels();
+  }, [fetchParcels]);
 
   const stats = {
     total: myParcels.length,
@@ -154,7 +226,11 @@ const CustomerDashboard: React.FC = () => {
         </div>
 
         <div className="table-wrapper">
-          {recent.length === 0 ? (
+          {loading && myParcels.length === 0 ? (
+            <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-muted)" }}>
+              Loading shipments...
+            </div>
+          ) : recent.length === 0 ? (
             <EmptyState
               title="No parcels yet"
               description="Book your first parcel to get started."
@@ -210,13 +286,25 @@ const CustomerDashboard: React.FC = () => {
                       <StatusBadge status={parcel.status} />
                     </td>
 
-                    <td
-                      style={{
-                        color: "var(--success)",
-                        fontWeight: 600,
-                      }}
-                    >
-                      Rs. {parcel.totalFee.toLocaleString()}
+                    <td>
+                      {parcel.totalFee ? (
+                        <span style={{ color: "var(--success)", fontWeight: 600 }}>
+                          Rs. {parcel.totalFee.toLocaleString()}
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "#d97706",
+                            background: "#fef3c7",
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                          }}
+                        >
+                          Pending Pricing
+                        </span>
+                      )}
                     </td>
 
                     <td>

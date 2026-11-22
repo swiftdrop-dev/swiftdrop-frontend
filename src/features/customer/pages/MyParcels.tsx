@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Search, Package, FileText, Download, Star } from "lucide-react";
 
@@ -11,12 +11,70 @@ import {
   useToast,
 } from "../../../components/shared/SharedComponents";
 
-import { useAuth } from "../../auth/context/AuthContext";
-import { useParcels, saveParcel } from "../services/parcel-store";
+import { customerParcelApi, type ParcelBookingResponse } from "../services/customer-parcel.api";
 import { downloadReceipt } from "../services/receipt";
 
-import type { Parcel } from "../../../types/global.types";
+import type { Parcel, ParcelStatus, ParcelSize, Address } from "../../../types/global.types";
 import "../customer.css";
+
+function parseAddress(addrStr?: string): Address {
+  if (!addrStr) return { street: "", city: "", district: "" };
+  const parts = addrStr.split(",").map((p) => p.trim());
+  return {
+    street: parts[0] || "",
+    city: parts[1] || "",
+    district: parts[2] || "",
+  };
+}
+
+function mapStatus(backendStatus: string): ParcelStatus {
+  const s = backendStatus.toLowerCase();
+  if (s === "created") return "pending";
+  if (s === "assigned") return "assigned";
+  if (s === "picked_up" || s === "pickedup") return "picked_up";
+  if (s === "in_transit") return "in_transit";
+  if (s === "out_for_delivery") return "out_for_delivery";
+  if (s === "delivered") return "delivered";
+  if (s === "failed") return "failed";
+  if (s === "cancelled") return "cancelled";
+  if (s === "returned") return "returned";
+  return "pending";
+}
+
+function mapResponseToParcel(item: ParcelBookingResponse): Parcel {
+  const status = mapStatus(item.status);
+  return {
+    id: item.id,
+    trackingNumber: item.trackingNumber,
+    status,
+    senderId: item.senderId,
+    senderName: item.senderName || "",
+    senderPhone: item.senderPhone || "",
+    senderType: "customer",
+    recipientName: item.recipientName,
+    recipientPhone: item.recipientPhone,
+    recipientAddress: parseAddress(item.recipientAddress),
+    pickupAddress: parseAddress(item.pickupAddress),
+    description: item.description || "",
+    weight: item.weightKg || 1,
+    size: (item.parcelSize?.toLowerCase() || "sm") as ParcelSize,
+    fragile: !!item.fragile,
+    deliveryFee: item.totalFee || 0,
+    totalFee: item.totalFee || 0,
+    paymentStatus: (item.paymentStatus?.toLowerCase() || "pending") as "pending" | "paid" | "refunded",
+    paymentMethod: (item.paymentMethod?.toLowerCase() || "cod") as "cod" | "online",
+    courierId: item.courierId || undefined,
+    estimatedDeliveryDate: item.estimatedDeliveryDate || undefined,
+    createdAt: item.createdAt || new Date().toISOString(),
+    statusHistory: [
+      {
+        status,
+        timestamp: item.createdAt || new Date().toISOString(),
+        note: `Current status: ${item.status}`,
+      },
+    ],
+  };
+}
 
 const STATUS_FILTERS = [
   { label: "All", value: "all" },
@@ -29,7 +87,6 @@ const STATUS_FILTERS = [
 ];
 
 const MyParcels: React.FC = () => {
-  const { user } = useAuth();
   const location = useLocation();
 
   const [search, setSearch] = useState("");
@@ -53,11 +110,36 @@ const MyParcels: React.FC = () => {
   const [hoverRating, setHoverRating] = useState<number | null>(null);
   const [feedbackComment, setFeedbackComment] = useState("");
 
-  const myParcels = useParcels().filter(
-    (parcel) => parcel.senderId === user?.id,
-  );
+  const [parcels, setParcels] = useState<Parcel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
 
-  const filtered = myParcels
+  const fetchMyParcels = useCallback(async () => {
+    try {
+      setLoading(true);
+      setFetchError("");
+      const response = await customerParcelApi.getMyParcels({ size: 100 });
+      if (response && Array.isArray(response.content)) {
+        setParcels(response.content.map(mapResponseToParcel));
+      } else {
+        setParcels([]);
+      }
+    } catch (err: any) {
+      setFetchError(
+        err.response?.data?.message ||
+          err.message ||
+          "Failed to load parcels from server.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMyParcels();
+  }, [fetchMyParcels]);
+
+  const filtered = parcels
     .filter((parcel) => {
       const query = search.toLowerCase();
 
@@ -133,7 +215,9 @@ const MyParcels: React.FC = () => {
       feedbackSubmittedAt: new Date().toISOString(),
     };
 
-    saveParcel(updated);
+    setParcels((prev) =>
+      prev.map((p) => (p.id === updated.id ? updated : p)),
+    );
     showToast("Thank you! Your feedback has been recorded.", "success");
     setFeedbackParcel(null);
   }
@@ -265,10 +349,14 @@ const MyParcels: React.FC = () => {
 
       <div className="card">
         <div className="table-wrapper">
-          {filtered.length === 0 ? (
+          {loading && parcels.length === 0 ? (
+            <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-muted)" }}>
+              Loading your parcels...
+            </div>
+          ) : filtered.length === 0 ? (
             <EmptyState
-              title="No parcels found"
-              description="Try adjusting your search or filters."
+              title={fetchError ? "Failed to load parcels" : "No parcels found"}
+              description={fetchError || "Try adjusting your search or filters."}
             />
           ) : (
             <table className="table">
@@ -328,13 +416,25 @@ const MyParcels: React.FC = () => {
                       <StatusBadge status={parcel.status} />
                     </td>
 
-                    <td
-                      style={{
-                        color: "var(--success)",
-                        fontWeight: 600,
-                      }}
-                    >
-                      Rs. {parcel.totalFee.toLocaleString()}
+                    <td>
+                      {parcel.totalFee ? (
+                        <span style={{ color: "var(--success)", fontWeight: 600 }}>
+                          Rs. {parcel.totalFee.toLocaleString()}
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "#d97706",
+                            background: "#fef3c7",
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                          }}
+                        >
+                          Pending Pricing
+                        </span>
+                      )}
                     </td>
 
                     <td>
