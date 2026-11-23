@@ -16,7 +16,7 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/api/v1': {
-        target: process.env.VITE_GATEWAY_URL || 'http://localhost:8080',
+        target: process.env.VITE_GATEWAY_URL || 'http://localhost:8079',
         changeOrigin: true,
       },
     },

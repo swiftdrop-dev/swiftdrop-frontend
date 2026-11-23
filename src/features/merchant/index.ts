@@ -5,3 +5,4 @@ export { default as MerchantApiKeys } from "./pages/MerchantApiKeys";
 export { default as MerchantOrderCreate } from "./pages/MerchantOrderCreate";
 export { default as MerchantOrders } from "./pages/MerchantOrders";
 export { default as MerchantOrderDetail } from "./pages/MerchantOrderDetail";
+export { default as MerchantWebhooksPage } from "./pages/MerchantWebhooksPage";

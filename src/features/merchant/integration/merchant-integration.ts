@@ -1,10 +1,12 @@
 import { createContext, useContext } from "react";
-import type { MerchantProfile, ApiKeyMetadata } from "../types/merchant.types";
+import type { MerchantProfile, ApiKeyMetadata, Page } from "../types/merchant.types";
 import type { MerchantOrder } from "../types/merchant-order.types";
 import type { createProfileService } from "../services/merchant-profile.service";
 import type { createCredentialsService } from "../services/merchant-credentials.service";
 import type { createOrdersService } from "../services/merchant-orders.service";
 import { unavailable } from "../services/merchant-api-error";
+import { apiClient } from "../../../lib/api-client";
+import { merchantApi } from "../api/merchant.api";
 export interface MerchantIntegration {
   mode: "unavailable" | "preview" | "live";
   accountId: string;
@@ -151,6 +153,139 @@ export function previewIntegration(state: string): MerchantIntegration {
         };
       },
       detail: async (id) => (id === order.id ? order : unavailable()),
+    },
+  };
+}
+
+export function liveIntegration(accountId: string): MerchantIntegration {
+  return {
+    mode: "live",
+    accountId,
+    managementReady: true,
+    ordersReady: true,
+    profile: {
+      get: async () => {
+        try {
+          return await merchantApi.getMyProfile();
+        } catch (e: any) {
+          if (e?.response?.status === 404 || e?.status === 404) return null;
+          throw e;
+        }
+      },
+      onboard: async (data) => {
+        return await merchantApi.register({
+          businessName: data.businessName,
+          registrationNumber: data.registrationNumber,
+          businessType: "OTHER",
+          primaryContactName: data.contactName,
+          primaryContactEmail: data.contactEmail,
+          primaryContactPhone: data.contactPhone,
+        });
+      },
+      update: async (_data) => {
+        const profile = await merchantApi.getMyProfile();
+        return await merchantApi.updateProfile(profile.id, {
+          businessName: profile.businessName,
+          tradeName: profile.tradeName,
+          taxId: profile.taxIdentificationNumber || profile.taxId,
+          businessType: profile.businessType,
+        });
+      },
+    },
+    credentials: {
+      list: async (page, size) => {
+        try {
+          const profile = await merchantApi.getMyProfile();
+          const keys = await merchantApi.listApiKeys(profile.id);
+          const mapped: ApiKeyMetadata[] = (keys || []).map((k) => ({
+            id: k.id,
+            name: k.keyPrefix,
+            publicId: k.keyPrefix,
+            scopes: ["orders:read", "orders:write"],
+            createdAt: k.createdAt,
+            expiresAt: k.expiresAt || new Date(Date.now() + 365 * 86400000).toISOString(),
+            revokedAt: null,
+            replacementId: null,
+            state: "ACTIVE",
+          }));
+          return {
+            data: mapped.slice(page * size, (page + 1) * size),
+            total: mapped.length,
+            page,
+            size,
+          };
+        } catch {
+          return { data: [], total: 0, page, size };
+        }
+      },
+      issue: async (data) => {
+        const profile = await merchantApi.getMyProfile();
+        const res = await merchantApi.generateApiKey(profile.id, {
+          label: data.name,
+          environment: "PRODUCTION",
+        });
+        const meta: ApiKeyMetadata = {
+          id: res.id,
+          name: res.keyPrefix,
+          publicId: res.keyPrefix,
+          scopes: data.scopes,
+          createdAt: new Date().toISOString(),
+          expiresAt: res.expiresAt || new Date(Date.now() + 365 * 86400000).toISOString(),
+          revokedAt: null,
+          replacementId: null,
+          state: "ACTIVE",
+        };
+        return {
+          credential: meta,
+          apiKey: res.rawApiKey,
+        };
+      },
+      rotate: async (id, expiresAt) => {
+        const profile = await merchantApi.getMyProfile();
+        await merchantApi.revokeApiKey(profile.id, id);
+        const res = await merchantApi.generateApiKey(profile.id, {
+          label: "Rotated API Key",
+          environment: "PRODUCTION",
+        });
+        const meta: ApiKeyMetadata = {
+          id: res.id,
+          name: res.keyPrefix,
+          publicId: res.keyPrefix,
+          scopes: ["orders:read", "orders:write"],
+          createdAt: new Date().toISOString(),
+          expiresAt: expiresAt || res.expiresAt || new Date(Date.now() + 365 * 86400000).toISOString(),
+          revokedAt: null,
+          replacementId: null,
+          state: "ACTIVE",
+        };
+        return {
+          credential: meta,
+          apiKey: res.rawApiKey,
+        };
+      },
+      revoke: async (id) => {
+        const profile = await merchantApi.getMyProfile();
+        await merchantApi.revokeApiKey(profile.id, id);
+      },
+    },
+    orders: {
+      list: async (query, signal) => {
+        const res = await apiClient.get<Page<MerchantOrder>>("/merchants/orders", {
+          params: query,
+          signal,
+        });
+        return res.data;
+      },
+      detail: async (id) => {
+        const res = await apiClient.get<MerchantOrder>(`/merchants/orders/${encodeURIComponent(id)}`);
+        return res.data;
+      },
+      create: async (data, key) => {
+        const res = await apiClient.post<MerchantOrder>("/merchants/orders", data, {
+          headers: { "Idempotency-Key": key },
+        });
+        return res.data;
+      },
     },
   };
 }

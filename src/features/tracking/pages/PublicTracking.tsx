@@ -5,28 +5,19 @@ import {
   Package,
   ArrowLeft,
   MapPin,
-  Phone,
-  User,
+  Clock,
+  ShieldCheck,
 } from "lucide-react";
 
-import { customerParcelApi, type ParcelBookingResponse } from "../../customer/services/customer-parcel.api";
-import type { Parcel, ParcelStatus, ParcelSize, Address } from "../../../types/global.types";
+import { trackingApi, type PublicTrackingData, type TrackingTimelineItem } from "../api/tracking.api";
+import type { ParcelStatus } from "../../../types/global.types";
 import {
   StatusBadge,
   StatusTimeline,
 } from "../../../components/shared/SharedComponents";
 
-function parseAddress(addrStr?: string): Address {
-  if (!addrStr) return { street: "", city: "", district: "" };
-  const parts = addrStr.split(",").map((p) => p.trim());
-  return {
-    street: parts[0] || "",
-    city: parts[1] || "",
-    district: parts[2] || "",
-  };
-}
-
 function mapStatus(backendStatus: string): ParcelStatus {
+  if (!backendStatus) return "pending";
   const s = backendStatus.toLowerCase();
   if (s === "created") return "pending";
   if (s === "assigned") return "assigned";
@@ -34,45 +25,26 @@ function mapStatus(backendStatus: string): ParcelStatus {
   if (s === "in_transit") return "in_transit";
   if (s === "out_for_delivery") return "out_for_delivery";
   if (s === "delivered") return "delivered";
-  if (s === "failed") return "failed";
+  if (s === "failed" || s === "delivery_failed") return "failed";
   if (s === "cancelled") return "cancelled";
   if (s === "returned") return "returned";
   return "pending";
 }
 
-function mapResponseToParcel(item: ParcelBookingResponse): Parcel {
-  const status = mapStatus(item.status);
-  return {
-    id: item.id,
-    trackingNumber: item.trackingNumber,
-    status,
-    senderId: item.senderId,
-    senderName: item.senderName || "",
-    senderPhone: item.senderPhone || "",
-    senderType: "customer",
-    recipientName: item.recipientName,
-    recipientPhone: item.recipientPhone,
-    recipientAddress: parseAddress(item.recipientAddress),
-    pickupAddress: parseAddress(item.pickupAddress),
-    description: item.description || "",
-    weight: item.weightKg || 1,
-    size: (item.parcelSize?.toLowerCase() || "sm") as ParcelSize,
-    fragile: !!item.fragile,
-    deliveryFee: item.totalFee || 0,
-    totalFee: item.totalFee || 0,
-    paymentStatus: (item.paymentStatus?.toLowerCase() || "pending") as "pending" | "paid" | "refunded",
-    paymentMethod: (item.paymentMethod?.toLowerCase() || "cod") as "cod" | "online",
-    courierId: item.courierId || undefined,
-    estimatedDeliveryDate: item.estimatedDeliveryDate || undefined,
-    createdAt: item.createdAt || new Date().toISOString(),
-    statusHistory: [
-      {
-        status,
-        timestamp: item.createdAt || new Date().toISOString(),
-        note: `Current status: ${item.status}`,
-      },
-    ],
-  };
+interface PublicTrackingResult {
+  trackingNumber: string;
+  status: ParcelStatus;
+  pickupCity: string;
+  pickupDistrict: string;
+  deliveryCity: string;
+  deliveryDistrict: string;
+  timeline: TrackingTimelineItem[];
+  statusHistory: {
+    status: ParcelStatus;
+    timestamp: string;
+    note?: string;
+    location?: string;
+  }[];
 }
 
 const PublicTracking: React.FC = () => {
@@ -81,11 +53,11 @@ const PublicTracking: React.FC = () => {
   const initialQuery = params.get("q")?.trim() ?? "";
 
   const [trackingNum, setTrackingNum] = useState(initialQuery);
-  const [result, setResult] = useState<Parcel | null>(null);
+  const [result, setResult] = useState<PublicTrackingResult | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const performLookup = useCallback(async (num: string) => {
+  const performLookup = useCallback(async (num: string, isSilent = false) => {
     if (!num.trim()) {
       setResult(null);
       setNotFound(false);
@@ -93,21 +65,52 @@ const PublicTracking: React.FC = () => {
     }
 
     try {
-      setLoading(true);
-      setNotFound(false);
-      const res = await customerParcelApi.getParcelByTrackingNumber(num.trim());
+      if (!isSilent) {
+        setLoading(true);
+        setNotFound(false);
+      }
+      const res: PublicTrackingData = await trackingApi.getPublicTracking(num.trim());
       if (res && res.trackingNumber) {
-        setResult(mapResponseToParcel(res));
+        const status = mapStatus(res.status);
+        const history = (res.timeline || []).map((t) => ({
+          status: mapStatus(t.status),
+          timestamp: t.timestamp,
+          note: t.description || t.title,
+          location: t.location || undefined,
+        }));
+
+        setResult({
+          trackingNumber: res.trackingNumber,
+          status,
+          pickupCity: res.pickupCity || "Origin Hub",
+          pickupDistrict: res.pickupDistrict || "",
+          deliveryCity: res.deliveryCity || "Destination Area",
+          deliveryDistrict: res.deliveryDistrict || "",
+          timeline: res.timeline || [],
+          statusHistory: history.length > 0 ? history : [
+            {
+              status,
+              timestamp: new Date().toISOString(),
+              note: `Status: ${res.status}`,
+            },
+          ],
+        });
         setNotFound(false);
       } else {
+        if (!isSilent) {
+          setResult(null);
+          setNotFound(true);
+        }
+      }
+    } catch {
+      if (!isSilent) {
         setResult(null);
         setNotFound(true);
       }
-    } catch {
-      setResult(null);
-      setNotFound(true);
     } finally {
-      setLoading(false);
+      if (!isSilent) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -116,6 +119,21 @@ const PublicTracking: React.FC = () => {
       performLookup(initialQuery);
     }
   }, [initialQuery, performLookup]);
+
+  // Automatic HTTP polling for active non-terminal parcels with cleanup on unmount
+  useEffect(() => {
+    if (!result?.trackingNumber) return;
+    const isTerminal = ["delivered", "cancelled", "returned"].includes(result.status);
+    if (isTerminal) return;
+
+    const intervalId = setInterval(() => {
+      performLookup(result.trackingNumber, true);
+    }, 15000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [result?.trackingNumber, result?.status, performLookup]);
 
   const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -183,7 +201,7 @@ const PublicTracking: React.FC = () => {
               color: "var(--text-secondary)",
             }}
           >
-            Enter your tracking number to check delivery status.
+            Enter your tracking number to check delivery progress and status.
           </p>
         </div>
 
@@ -224,7 +242,7 @@ const PublicTracking: React.FC = () => {
                 height: 50,
                 width: "100%",
               }}
-              placeholder="e.g. SWF-2024-001234"
+              placeholder="e.g. SWF-2026-001234"
               value={trackingNum}
               onChange={(event) =>
                 setTrackingNum(event.target.value)
@@ -311,38 +329,13 @@ const PublicTracking: React.FC = () => {
                 style={{
                   fontSize: 13,
                   color: "var(--text-muted)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
                 }}
               >
-                <p>
-                  Booked{" "}
-                  {new Date(
-                    result.createdAt,
-                  ).toLocaleDateString("en-LK", {
-                    dateStyle: "medium",
-                  })}
-                </p>
-
-                {result.deliveredAt ? (
-                  <p>
-                    Delivered{" "}
-                    {new Date(
-                      result.deliveredAt,
-                    ).toLocaleDateString("en-LK", {
-                      dateStyle: "medium",
-                    })}
-                  </p>
-                ) : (
-                  result.estimatedDeliveryDate && (
-                    <p>
-                      Est.{" "}
-                      {new Date(
-                        result.estimatedDeliveryDate,
-                      ).toLocaleDateString("en-LK", {
-                        dateStyle: "medium",
-                      })}
-                    </p>
-                  )
-                )}
+                <ShieldCheck size={14} color="var(--success)" />
+                <span>Verified SwiftDrop Delivery</span>
               </div>
             </div>
 
@@ -355,7 +348,7 @@ const PublicTracking: React.FC = () => {
                 gap: 24,
               }}
             >
-              {/* Parcel and route details */}
+              {/* Route details */}
               <div
                 style={{
                   display: "flex",
@@ -376,7 +369,7 @@ const PublicTracking: React.FC = () => {
                       marginBottom: 8,
                     }}
                   >
-                    Parcel Details
+                    Route Overview
                   </p>
 
                   <div
@@ -387,34 +380,7 @@ const PublicTracking: React.FC = () => {
                       fontSize: 14,
                     }}
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 8,
-                        alignItems: "flex-start",
-                      }}
-                    >
-                      <Package
-                        size={14}
-                        style={{
-                          color: "var(--text-muted)",
-                          marginTop: 2,
-                          flexShrink: 0,
-                        }}
-                      />
-
-                      <span
-                        style={{
-                          color: "var(--text-secondary)",
-                        }}
-                      >
-                        {result.description}
-                      </span>
-                    </div>
-
-                    <div
-                      style={{ display: "flex", gap: 8 }}
-                    >
+                    <div style={{ display: "flex", gap: 8 }}>
                       <MapPin
                         size={14}
                         style={{
@@ -425,29 +391,17 @@ const PublicTracking: React.FC = () => {
                       />
 
                       <div>
-                        <p
-                          style={{
-                            color: "var(--text-muted)",
-                            fontSize: 11,
-                          }}
-                        >
+                        <p style={{ color: "var(--text-muted)", fontSize: 11 }}>
                           From
                         </p>
-
-                        <p
-                          style={{
-                            color: "var(--text-secondary)",
-                          }}
-                        >
-                          {result.pickupAddress.city},{" "}
-                          {result.pickupAddress.district}
+                        <p style={{ color: "var(--text-secondary)" }}>
+                          {result.pickupCity}
+                          {result.pickupDistrict ? `, ${result.pickupDistrict}` : ""}
                         </p>
                       </div>
                     </div>
 
-                    <div
-                      style={{ display: "flex", gap: 8 }}
-                    >
+                    <div style={{ display: "flex", gap: 8 }}>
                       <MapPin
                         size={14}
                         style={{
@@ -458,37 +412,38 @@ const PublicTracking: React.FC = () => {
                       />
 
                       <div>
-                        <p
-                          style={{
-                            color: "var(--text-muted)",
-                            fontSize: 11,
-                          }}
-                        >
+                        <p style={{ color: "var(--text-muted)", fontSize: 11 }}>
                           To
                         </p>
-
-                        <p
-                          style={{
-                            color: "var(--text-secondary)",
-                          }}
-                        >
-                          {result.recipientAddress.street},{" "}
-                          {result.recipientAddress.city}
+                        <p style={{ color: "var(--text-secondary)" }}>
+                          {result.deliveryCity}
+                          {result.deliveryDistrict ? `, ${result.deliveryDistrict}` : ""}
                         </p>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Courier */}
-                {result.courierName && (
-                  <div
-                    style={{
-                      background: "var(--bg-overlay)",
-                      borderRadius: 14,
-                      padding: 14,
-                    }}
-                  >
+                {/* Privacy note */}
+                <div
+                  style={{
+                    background: "var(--bg-overlay)",
+                    borderRadius: 12,
+                    padding: 12,
+                    fontSize: 12,
+                    color: "var(--text-muted)",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <p style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>
+                    <ShieldCheck size={14} /> Public Privacy Protection
+                  </p>
+                  Recipient name, phone, and detailed street addresses are masked for security. Full parcel details are accessible via the customer portal.
+                </div>
+
+                {/* Event history list */}
+                {result.timeline.length > 0 && (
+                  <div>
                     <p
                       style={{
                         fontSize: 11,
@@ -496,139 +451,38 @@ const PublicTracking: React.FC = () => {
                         textTransform: "uppercase",
                         letterSpacing: "0.06em",
                         color: "var(--text-muted)",
-                        marginBottom: 8,
+                        marginBottom: 10,
                       }}
                     >
-                      Courier
+                      Recent Activity
                     </p>
 
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 8,
-                        alignItems: "center",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: "50%",
-                          background: "var(--grad)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: "white",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {result.courierName
-                          .slice(0, 2)
-                          .toUpperCase()}
-                      </div>
-
-                      <div>
-                        <p
-                          style={{
-                            fontSize: 14,
-                            fontWeight: 600,
-                            color: "var(--text-primary)",
-                          }}
-                        >
-                          {result.courierName}
-                        </p>
-
-                        {result.courierPhone && (
-                          <p
-                            style={{
-                              fontSize: 12,
-                              color: "var(--text-muted)",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 4,
-                            }}
-                          >
-                            <Phone size={11} />
-                            {result.courierPhone}
-                          </p>
-                        )}
-                      </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {[...result.timeline].reverse().slice(0, 4).map((item, idx) => (
+                        <div key={idx} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13 }}>
+                          <Clock size={13} style={{ color: "var(--primary-light)", marginTop: 3, flexShrink: 0 }} />
+                          <div>
+                            <p style={{ fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+                              {item.title}
+                            </p>
+                            {item.description && (
+                              <p style={{ color: "var(--text-secondary)", fontSize: 12, margin: "2px 0 0" }}>
+                                {item.description}
+                              </p>
+                            )}
+                            <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "2px 0 0" }}>
+                              {new Date(item.timestamp).toLocaleString("en-LK", { dateStyle: "medium", timeStyle: "short" })}
+                              {item.location && ` · ${item.location}`}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
-
-                {/* Recipient */}
-                <div
-                  style={{
-                    background: "var(--bg-overlay)",
-                    borderRadius: 14,
-                    padding: 14,
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      color: "var(--text-muted)",
-                      marginBottom: 8,
-                    }}
-                  >
-                    Recipient
-                  </p>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 6,
-                      alignItems: "center",
-                      marginBottom: 4,
-                    }}
-                  >
-                    <User
-                      size={13}
-                      color="var(--text-muted)"
-                    />
-
-                    <span
-                      style={{
-                        fontSize: 14,
-                        color: "var(--text-primary)",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {result.recipientName}
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 6,
-                      alignItems: "center",
-                    }}
-                  >
-                    <Phone
-                      size={13}
-                      color="var(--text-muted)"
-                    />
-
-                    <span
-                      style={{
-                        fontSize: 13,
-                        color: "var(--text-secondary)",
-                      }}
-                    >
-                      {result.recipientPhone}
-                    </span>
-                  </div>
-                </div>
               </div>
 
-              {/* Timeline */}
+              {/* Progress Timeline */}
               <div style={{ minWidth: 0 }}>
                 <p
                   style={{

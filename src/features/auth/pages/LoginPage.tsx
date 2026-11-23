@@ -21,6 +21,7 @@ import {
   AuthAside,
   AuthMobileLogo,
 } from '../../../components/shared/AuthAside';
+import { GoogleSignInButton } from '../components/GoogleSignInButton';
 
 const DEMO_ACCOUNTS: {
   role: UserRole;
@@ -61,13 +62,15 @@ const DEMO_ACCOUNTS: {
 ];
 
 const LoginPage: React.FC = () => {
-  const { login, isAuthenticated, user } = useAuth();
+  const { login, googleLogin, isAuthenticated, user } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
+
 
   if (isAuthenticated && user) {
     const redirects: Record<string, string> = {
@@ -96,6 +99,20 @@ const LoginPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const handleGoogleCredential = async (credential: string) => {
+    setError('');
+    setGoogleLoading(true);
+    try {
+      const result = await googleLogin(credential);
+      if (!result.success) {
+        setError(result.error ?? 'Google sign-in failed');
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
 
   return (
     <div className="auth-page">
@@ -144,7 +161,10 @@ const LoginPage: React.FC = () => {
                   className="form-input"
                   placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (error) setError('');
+                  }}
                   required
                   autoComplete="email"
                 />
@@ -168,7 +188,10 @@ const LoginPage: React.FC = () => {
                   className="form-input"
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (error) setError('');
+                  }}
                   required
                   style={{ paddingRight: 40 }}
                   autoComplete="current-password"
@@ -228,6 +251,37 @@ const LoginPage: React.FC = () => {
             </button>
           </form>
 
+          {/* Google Sign In */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              margin: '20px 0',
+              gap: 12,
+            }}
+          >
+            <div style={{ flex: 1, height: 1, backgroundColor: 'var(--border)' }} />
+            <span
+              style={{
+                fontSize: 12,
+                color: 'var(--text-muted)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}
+            >
+              or continue with
+            </span>
+            <div style={{ flex: 1, height: 1, backgroundColor: 'var(--border)' }} />
+          </div>
+
+          <GoogleSignInButton
+            label="Sign in with Google"
+            onCredential={handleGoogleCredential}
+            onError={(err) => setError(err)}
+            disabled={loading || googleLoading}
+            loading={googleLoading}
+          />
+
           {/* Demo Accounts */}
           <div
             style={{
@@ -256,6 +310,7 @@ const LoginPage: React.FC = () => {
                   type="button"
                   onClick={() => {
                     setEmail(account.email);
+                    setPassword('demo1234');
                     setError('');
                   }}
                   className="btn"

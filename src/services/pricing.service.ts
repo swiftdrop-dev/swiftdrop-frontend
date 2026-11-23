@@ -40,14 +40,50 @@ export interface FeeEstimateResponse {
   estimatedDeliveryDays: number;
 }
 
+export function mapDistrictToZoneCode(district: string): string {
+  if (!district) return 'ZONE_WP_COLOMBO';
+  const d = district.trim().toLowerCase();
+  if (d === 'colombo') return 'ZONE_WP_COLOMBO';
+  if (d === 'gampaha' || d === 'kalutara') return 'ZONE_WP_SUBURB';
+  if (['kandy', 'matale', 'nuwara eliya', 'kurunegala', 'kegalle', 'anuradhapura', 'polonnaruwa', 'badulla', 'monaragala', 'jaffna', 'kilinochchi', 'mannar', 'vavuniya', 'mullaitivu', 'batticaloa', 'ampara', 'trincomalee', 'puttalam'].includes(d)) {
+    return 'ZONE_CP_KANDY';
+  }
+  if (['galle', 'matara', 'hambantota', 'ratnapura'].includes(d)) {
+    return 'ZONE_SP_GALLE';
+  }
+  return 'ZONE_WP_COLOMBO';
+}
+
+export function mapDistrictToZoneId(district: string, zones?: Zone[]): number {
+  const code = mapDistrictToZoneCode(district);
+  if (zones && zones.length > 0) {
+    const found = zones.find((z) => z.code === code);
+    if (found) return found.id;
+  }
+  if (code === 'ZONE_WP_COLOMBO') return 1;
+  if (code === 'ZONE_WP_SUBURB') return 2;
+  if (code === 'ZONE_CP_KANDY') return 3;
+  if (code === 'ZONE_SP_GALLE') return 4;
+  return 1;
+}
+
 // Helper to try API Gateway (8080) first, or direct pricing-service (8083) if gateway is offline
 async function fetchPricing(path: string, options?: RequestInit): Promise<Response> {
+  const token = localStorage.getItem('swiftdrop_token');
+  const headers = new Headers(options?.headers || {});
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  const mergedOptions: RequestInit = {
+    ...options,
+    headers,
+  };
   try {
-    const res = await fetch(`${API_BASE_URL}${path}`, options);
+    const res = await fetch(`${API_BASE_URL}${path}`, mergedOptions);
     if (res.ok || res.status < 500) return res;
     throw new Error('Gateway returned 5xx');
   } catch {
-    return await fetch(`http://localhost:8083/api/v1${path}`, options);
+    return await fetch(`http://localhost:8083/api/v1${path}`, mergedOptions);
   }
 }
 
@@ -84,7 +120,14 @@ export const pricingService = {
   async downloadReceiptPdf(trackingNumber: string): Promise<void> {
     const response = await fetchPricing(`/receipts/${trackingNumber}`);
     if (!response.ok) {
-      throw new Error('Failed to generate PDF receipt');
+      if (response.status === 403) {
+        throw new Error('Access denied: You can only download receipts for your own parcels');
+      }
+      if (response.status === 404) {
+        throw new Error(`Receipt not found for tracking number ${trackingNumber}`);
+      }
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to generate PDF receipt');
     }
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
@@ -99,7 +142,11 @@ export const pricingService = {
 
   async getAllZonesAdmin(): Promise<Zone[]> {
     const response = await fetchPricing('/zones/admin/all');
-    return await response.json();
+    if (!response.ok) {
+      throw new Error(`Failed to fetch admin zones: ${response.status}`);
+    }
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
   },
 
   async createZoneAdmin(zone: { name: string; code: string }): Promise<Zone> {
@@ -108,12 +155,20 @@ export const pricingService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(zone),
     });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || `Failed to create zone: ${response.status}`);
+    }
     return await response.json();
   },
 
   async getAllRatesAdmin(): Promise<ZoneRate[]> {
     const response = await fetchPricing('/zones/admin/rates');
-    return await response.json();
+    if (!response.ok) {
+      throw new Error(`Failed to fetch admin rates: ${response.status}`);
+    }
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
   },
 
   async saveRateAdmin(rate: ZoneRate): Promise<ZoneRate> {

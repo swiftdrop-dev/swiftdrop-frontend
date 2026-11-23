@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle, Clock, Package, Star, Truck } from 'lucide-re
 import DashboardLayout from '../../../components/layout/DashboardLayout';
 import { EmptyState, StatCard } from '../../../components/shared/SharedComponents';
 import { courierApi } from '../api/courier.api';
+import { courierDeliveriesApi } from '../api/deliveries.api';
 
 const CourierDashboard: React.FC = () => {
   const {
@@ -17,6 +18,16 @@ const CourierDashboard: React.FC = () => {
     queryKey: ['courier', 'me'],
     queryFn: courierApi.getCurrentProfile,
   });
+
+  const { data: jobOffers } = useQuery({
+    queryKey: ['courier', 'job-offers'],
+    queryFn: courierDeliveriesApi.getJobOffers,
+    refetchInterval: 15000,
+  });
+
+  const pendingOffersCount = (jobOffers ?? []).filter(
+    job => job.status === 'ASSIGNED_PENDING_ACCEPTANCE'
+  ).length;
 
   const availability = courier?.available == null
     ? 'Availability unavailable'
@@ -50,6 +61,40 @@ const CourierDashboard: React.FC = () => {
               </button>
             }
           />
+        </div>
+      )}
+
+      {pendingOffersCount > 0 && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 20,
+            padding: '16px 20px',
+            border: '1px solid var(--warning-border, #f59e0b40)',
+            background: 'var(--warning-bg, #fef3c720)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 12,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ padding: 8, background: 'var(--warning)', borderRadius: '50%', color: 'white', display: 'flex' }}>
+              <Package size={18} />
+            </div>
+            <div>
+              <strong style={{ fontSize: 15, color: 'var(--text-primary)' }}>
+                You have {pendingOffersCount} new delivery offer{pendingOffersCount > 1 ? 's' : ''}!
+              </strong>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '2px 0 0' }}>
+                Review and accept or decline incoming jobs in your deliveries tab.
+              </p>
+            </div>
+          </div>
+          <Link to="/courier/deliveries" className="btn btn-primary btn-sm">
+            Review Offers
+          </Link>
         </div>
       )}
 

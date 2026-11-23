@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/features/merchant/**/*.test.{ts,tsx}"],
+    include: ["src/**/*.test.{ts,tsx}"],
     clearMocks: true,
     maxWorkers: 2,
   },

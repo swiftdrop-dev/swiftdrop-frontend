@@ -20,7 +20,7 @@ export interface AssignedDeliveriesResponse {
 }
 
 export interface CourierParcelStatusUpdateRequest {
-  status: 'in_transit' | 'failed';
+  status: 'assigned' | 'picked_up' | 'in_transit' | 'out_for_delivery' | 'failed' | string;
   failureReason?: string;
 }
 
@@ -30,3 +30,26 @@ export interface CourierParcelStatusUpdateResponse {
   status: string;
   changedAt: string;
 }
+
+export interface DispatchJobOffer {
+  id: string;
+  parcelId: string;
+  trackingNumber: string;
+  merchantId?: string;
+  zoneCode?: string;
+  courierId?: string;
+  pickupCity: string;
+  deliveryCity: string;
+  parcelWeightKg: number;
+  requiredVehicleType?: string;
+  priority: string;
+  dispatchType?: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface CourierDecisionRequest {
+  decision: 'ACCEPT' | 'DECLINE';
+  reason?: string;
+}
+

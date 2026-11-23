@@ -42,8 +42,14 @@ export const authService = {
     return response.data;
   },
 
+  googleLogin: async (idToken: string): Promise<AuthApiResponse> => {
+    const response = await apiClient.post<AuthApiResponse>('/auth/google', { idToken });
+    return response.data;
+  },
+
   logout: () => {
     localStorage.removeItem('swiftdrop_token');
     localStorage.removeItem('swiftdrop_user');
   },
+
 };

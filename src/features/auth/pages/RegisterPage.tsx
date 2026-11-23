@@ -3,18 +3,23 @@ import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, Eye, EyeOff, User, Phone, ArrowRight } from 'lucide-react';
 import { AuthAside, AuthMobileLogo } from '../../../components/shared/AuthAside';
+import { GoogleSignInButton } from '../components/GoogleSignInButton';
 
 const RegisterPage: React.FC = () => {
-  const { register, isAuthenticated, user } = useAuth();
+  const { register, googleLogin, isAuthenticated, user } = useAuth();
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
 
   if (isAuthenticated && user) {
     const redirects: Record<string, string> = {
-      customer: '/customer', merchant: '/merchant',
-      courier: '/courier', dispatcher: '/dispatcher',
+      customer: '/customer',
+      merchant: '/merchant',
+      courier: '/courier',
+      dispatcher: '/dispatcher',
+      admin: '/admin/merchants',
     };
     return <Navigate to={redirects[user.role] ?? '/'} replace />;
   }
@@ -31,6 +36,19 @@ const RegisterPage: React.FC = () => {
       if (!result.success) setError(result.error ?? 'Registration failed');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleCredential = async (credential: string) => {
+    setError('');
+    setGoogleLoading(true);
+    try {
+      const result = await googleLogin(credential);
+      if (!result.success) {
+        setError(result.error ?? 'Google sign-up failed');
+      }
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -101,6 +119,37 @@ const RegisterPage: React.FC = () => {
             )}
           </button>
         </form>
+
+        {/* Google Sign In */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            margin: '20px 0',
+            gap: 12,
+          }}
+        >
+          <div style={{ flex: 1, height: 1, backgroundColor: 'var(--border)' }} />
+          <span
+            style={{
+              fontSize: 12,
+              color: 'var(--text-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+          >
+            or continue with
+          </span>
+          <div style={{ flex: 1, height: 1, backgroundColor: 'var(--border)' }} />
+        </div>
+
+        <GoogleSignInButton
+          label="Sign up with Google"
+          onCredential={handleGoogleCredential}
+          onError={(err) => setError(err)}
+          disabled={loading || googleLoading}
+          loading={googleLoading}
+        />
 
         <p className="auth-footer">
           Already have an account?{' '}

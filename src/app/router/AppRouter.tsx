@@ -14,12 +14,13 @@ import RegisterPage from '../../features/auth/pages/RegisterPage';
 import CustomerDashboard from '../../features/customer/pages/CustomerDashboard';
 import BookParcel from '../../features/customer/pages/BookParcel';
 import MyParcels from '../../features/customer/pages/MyParcels';
+import NotificationsPage from '../../features/notifications/pages/NotificationsPage';
 
 // Merchant
 import MerchantDashboard from '../../features/merchant/pages/MerchantDashboard';
 import BulkBooking from '../../features/merchant/pages/BulkBooking';
 import MerchantParcels from '../../features/merchant/pages/MerchantParcels';
-import { MerchantModuleBoundary, MerchantOnboarding, MerchantProfile, MerchantApiKeys, MerchantOrderCreate, MerchantOrders, MerchantOrderDetail } from '../../features/merchant';
+import { MerchantModuleBoundary, MerchantOnboarding, MerchantProfile, MerchantApiKeys, MerchantOrderCreate, MerchantOrders, MerchantOrderDetail, MerchantWebhooksPage } from '../../features/merchant';
 import AdminMerchantReviewPage from '../../features/merchant/pages/AdminMerchantReviewPage';
 
 // Courier
@@ -33,8 +34,8 @@ import AssignCourier from '../../features/dispatcher/pages/AssignCourier';
 import Reports from '../../features/dispatcher/pages/Reports';
 import DispatcherParcels from '../../features/dispatcher/pages/DispatcherParcels';
 
-// Admin Pricing & Estimates (Member 3)
-import AdminPricingPage from '../../features/admin/pages/AdminPricingPage';
+// Admin Pricing, Users & Estimates
+import { AdminUsersPage, AdminPricingPage } from '../../features/admin';
 import FeeEstimateWidget from '../../features/customer/components/FeeEstimateWidget';
 
 import { ProtectedRoute } from '../../components/shared/SharedComponents';
@@ -47,7 +48,7 @@ const RootRedirect: React.FC = () => {
     merchant: '/merchant',
     courier: '/courier',
     dispatcher: '/dispatcher',
-    admin: '/admin/merchants',
+    admin: '/admin/users',
   };
   return <Navigate to={redirects[user!.role] ?? '/login'} replace />;
 };
@@ -68,6 +69,7 @@ export const AppRouter: React.FC = () => {
         <Route path="/customer" element={<ProtectedRoute allowedRoles={['customer']}><CustomerDashboard /></ProtectedRoute>} />
         <Route path="/customer/book" element={<ProtectedRoute allowedRoles={['customer']}><BookParcel /></ProtectedRoute>} />
         <Route path="/customer/parcels" element={<ProtectedRoute allowedRoles={['customer']}><MyParcels /></ProtectedRoute>} />
+        <Route path="/customer/notifications" element={<ProtectedRoute allowedRoles={['customer']}><NotificationsPage /></ProtectedRoute>} />
 
         {/* Merchant */}
         <Route path="/merchant" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantDashboard /></MerchantModuleBoundary></ProtectedRoute>} />
@@ -75,6 +77,7 @@ export const AppRouter: React.FC = () => {
         <Route path="/merchant/onboarding" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantOnboarding /></MerchantModuleBoundary></ProtectedRoute>} />
         <Route path="/merchant/profile" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantProfile /></MerchantModuleBoundary></ProtectedRoute>} />
         <Route path="/merchant/api-keys" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantApiKeys /></MerchantModuleBoundary></ProtectedRoute>} />
+        <Route path="/merchant/webhooks" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantWebhooksPage /></MerchantModuleBoundary></ProtectedRoute>} />
         <Route path="/merchant/orders/new" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantOrderCreate /></MerchantModuleBoundary></ProtectedRoute>} />
         <Route path="/merchant/orders" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantOrders /></MerchantModuleBoundary></ProtectedRoute>} />
         <Route path="/merchant/orders/:id" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantOrderDetail /></MerchantModuleBoundary></ProtectedRoute>} />
@@ -92,10 +95,11 @@ export const AppRouter: React.FC = () => {
         <Route path="/dispatcher/assign" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><AssignCourier /></ProtectedRoute>} />
         <Route path="/dispatcher/reports" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><Reports /></ProtectedRoute>} />
 
-        {/* Admin Compliance, Pricing & Verification */}
-        <Route path="/admin/merchants" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><AdminMerchantReviewPage /></ProtectedRoute>} />
-        <Route path="/admin/merchants/pending" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><AdminMerchantReviewPage /></ProtectedRoute>} />
-        <Route path="/admin/pricing" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><AdminPricingPage /></ProtectedRoute>} />
+        {/* Admin Compliance, Pricing, Users & Verification */}
+        <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['admin']}><AdminUsersPage /></ProtectedRoute>} />
+        <Route path="/admin/merchants" element={<ProtectedRoute allowedRoles={['admin']}><AdminMerchantReviewPage /></ProtectedRoute>} />
+        <Route path="/admin/merchants/pending" element={<ProtectedRoute allowedRoles={['admin']}><AdminMerchantReviewPage /></ProtectedRoute>} />
+        <Route path="/admin/pricing" element={<ProtectedRoute allowedRoles={['admin']}><AdminPricingPage /></ProtectedRoute>} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

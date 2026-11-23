@@ -2,14 +2,14 @@ import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
-  AlertCircle, ArrowLeft, ArrowRight, CalendarDays, MapPin, Package,
-  Phone, Search, Truck, UserRound,
+  AlertCircle, ArrowLeft, ArrowRight, CalendarDays, Check, MapPin, Package,
+  Phone, Search, Truck, UserRound, X,
 } from 'lucide-react';
 import DashboardLayout from '../../../components/layout/DashboardLayout';
 import { EmptyState, Modal, StatusBadge } from '../../../components/shared/SharedComponents';
 import type { ParcelStatus } from '../../../types/global.types';
 import { courierDeliveriesApi } from '../api/deliveries.api';
-import type { AssignedDelivery } from '../types/delivery.types';
+import type { AssignedDelivery, DispatchJobOffer } from '../types/delivery.types';
 import './AssignedDeliveries.css';
 
 const PAGE_SIZE = 20;
@@ -31,23 +31,92 @@ const formatScheduledDate = (value: string | null | undefined) => {
 };
 const isKnownStatus = (status: string): status is ParcelStatus => KNOWN_STATUSES.includes(status as ParcelStatus);
 
+interface StatusOption {
+  status: string;
+  label: string;
+  isDanger?: boolean;
+}
+
+const getNextStatusOptions = (status: string): StatusOption[] => {
+  const s = status.toLowerCase();
+  switch (s) {
+    case 'assigned':
+      return [
+        { status: 'picked_up', label: 'Mark Picked Up' },
+        { status: 'in_transit', label: 'Start Transit' },
+      ];
+    case 'picked_up':
+      return [
+        { status: 'in_transit', label: 'In Transit' },
+        { status: 'out_for_delivery', label: 'Out for Delivery' },
+        { status: 'failed', label: 'Report Failed', isDanger: true },
+      ];
+    case 'in_transit':
+      return [
+        { status: 'out_for_delivery', label: 'Out for Delivery' },
+        { status: 'failed', label: 'Report Failed', isDanger: true },
+      ];
+    case 'out_for_delivery':
+      return [
+        { status: 'failed', label: 'Report Failed', isDanger: true },
+      ];
+    case 'failed':
+      return [
+        { status: 'in_transit', label: 'Retry (In Transit)' },
+        { status: 'out_for_delivery', label: 'Retry (Out for Delivery)' },
+      ];
+    case 'pending':
+    case 'created':
+      return [
+        { status: 'in_transit', label: 'Start Delivery' },
+      ];
+    default:
+      return [];
+  }
+};
+
 const AssignedDeliveries: React.FC = () => {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedDelivery, setSelectedDelivery] = useState<AssignedDelivery | null>(null);
+  const [chosenStatus, setChosenStatus] = useState<string>('');
+  const [failureReason, setFailureReason] = useState('');
+  const [statusUpdateError, setStatusUpdateError] = useState<string | null>(null);
+
+  // Queries
   const { data, isPending, isError, isFetching, refetch } = useQuery({
     queryKey: ['courier', 'assigned-deliveries', page, PAGE_SIZE],
     queryFn: () => courierDeliveriesApi.getAssignedDeliveries({ page, size: PAGE_SIZE }),
   });
 
+  const { data: jobOffers } = useQuery({
+    queryKey: ['courier', 'job-offers'],
+    queryFn: courierDeliveriesApi.getJobOffers,
+    refetchInterval: 15000,
+  });
+
+  const pendingOffers = useMemo(
+    () => (jobOffers ?? []).filter((job: DispatchJobOffer) => job.status === 'ASSIGNED_PENDING_ACCEPTANCE'),
+    [jobOffers]
+  );
+
+  // Mutations
+  const respondOffer = useMutation({
+    mutationFn: ({ id, decision, reason }: { id: string; decision: 'ACCEPT' | 'DECLINE'; reason?: string }) =>
+      courierDeliveriesApi.respondToJobOffer(id, { decision, reason }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['courier', 'job-offers'] });
+      await queryClient.invalidateQueries({ queryKey: ['courier', 'assigned-deliveries'] });
+    },
+  });
+
   const statusUpdate = useMutation({
-    mutationFn: (input: { parcelId: string; status: 'in_transit' | 'failed'; failureReason?: string }) =>
+    mutationFn: (input: { parcelId: string; status: string; failureReason?: string }) =>
       courierDeliveriesApi.updateParcelStatus(input.parcelId, { status: input.status, failureReason: input.failureReason }),
   });
-  const [failureReason, setFailureReason] = useState('');
-  const [statusUpdateError, setStatusUpdateError] = useState<string | null>(null);
+
   const deliveries = useMemo(() => data?.content ?? [], [data?.content]);
   const availableStatuses = [...new Set(deliveries.map(delivery => delivery.status))];
   const visibleDeliveries = useMemo(() => {
@@ -62,16 +131,28 @@ const AssignedDeliveries: React.FC = () => {
     });
   }, [deliveries, search, statusFilter]);
 
-  const nextStatus = selectedDelivery?.status === 'pending' || selectedDelivery?.status === 'failed'
-    ? 'in_transit' : selectedDelivery?.status === 'in_transit' ? 'failed' : null;
+  const statusOptions = useMemo(
+    () => (selectedDelivery ? getNextStatusOptions(selectedDelivery.status) : []),
+    [selectedDelivery]
+  );
+
+  // Reset chosen status when selected delivery changes
+  const handleSelectDelivery = (delivery: AssignedDelivery) => {
+    setSelectedDelivery(delivery);
+    const options = getNextStatusOptions(delivery.status);
+    setChosenStatus(options.length > 0 ? options[0].status : '');
+    setFailureReason('');
+    setStatusUpdateError(null);
+  };
 
   const updateStatus = async () => {
-    if (!selectedDelivery || !nextStatus || (nextStatus === 'failed' && !failureReason.trim())) return;
+    if (!selectedDelivery || !chosenStatus || (chosenStatus === 'failed' && !failureReason.trim())) return;
     setStatusUpdateError(null);
     try {
       const result = await statusUpdate.mutateAsync({
-        parcelId: selectedDelivery.parcelId, status: nextStatus,
-        ...(nextStatus === 'failed' ? { failureReason: failureReason.trim() } : {}),
+        parcelId: selectedDelivery.parcelId,
+        status: chosenStatus,
+        ...(chosenStatus === 'failed' ? { failureReason: failureReason.trim() } : {}),
       });
       setSelectedDelivery(current => current ? { ...current, status: result.status } : current);
       setFailureReason('');
@@ -96,9 +177,75 @@ const AssignedDeliveries: React.FC = () => {
         <Link to="/courier" className="btn btn-secondary deliveries-back"><ArrowLeft size={16} /> Dashboard</Link>
       </div>
 
+      {/* Pending Job Offers Section */}
+      {pendingOffers.length > 0 && (
+        <section
+          className="card"
+          style={{
+            marginBottom: 24,
+            border: '1px solid var(--warning-border, #f59e0b40)',
+            background: 'var(--warning-bg, #fef3c720)',
+          }}
+          aria-label="Incoming delivery offers"
+        >
+          <div className="card-header">
+            <div>
+              <h2 className="card-title" style={{ color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Truck size={18} color="var(--warning, #f59e0b)" />
+                Incoming Delivery Offers ({pendingOffers.length})
+              </h2>
+              <p className="deliveries-muted">Review and accept or decline incoming delivery job dispatches.</p>
+            </div>
+          </div>
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {pendingOffers.map((offer: DispatchJobOffer) => (
+              <div
+                key={offer.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: 'var(--bg-surface, #ffffff)',
+                  padding: '12px 16px',
+                  borderRadius: 10,
+                  border: '1px solid var(--border)',
+                  flexWrap: 'wrap',
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 15, letterSpacing: '0.04em' }}>
+                    {offer.trackingNumber}
+                  </strong>
+                  <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                    {offer.pickupCity} → {offer.deliveryCity} · {offer.parcelWeightKg} kg · Priority: {offer.priority}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    disabled={respondOffer.isPending}
+                    onClick={() => respondOffer.mutate({ id: offer.id, decision: 'ACCEPT' })}
+                  >
+                    <Check size={14} /> Accept
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    disabled={respondOffer.isPending}
+                    onClick={() => respondOffer.mutate({ id: offer.id, decision: 'DECLINE' })}
+                  >
+                    <X size={14} /> Decline
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="stats-grid deliveries-stats" aria-label="Delivery summary">
         <div className="stat-card primary"><div className="stat-icon primary"><Package size={20} /></div><div className="stat-value">{data?.content.length ?? '—'}</div><div className="stat-label">On this page</div></div>
-        <div className="stat-card info"><div className="stat-icon info"><Truck size={20} /></div><div className="stat-value">{data ? (data.hasNext ? 'More' : 'Current') : '—'}</div><div className="stat-label">Assignment list</div></div>
+        <div className="stat-card info"><div className="stat-icon info"><Truck size={20} /></div><div className="stat-value">{pendingOffers.length > 0 ? `${pendingOffers.length} Offers` : 'Active'}</div><div className="stat-label">Pending offers</div></div>
       </section>
 
       <section className="card deliveries-list-card" aria-label="Assigned delivery list">
@@ -118,7 +265,7 @@ const AssignedDeliveries: React.FC = () => {
             </select>
           </label>
         </div>
-        <p className="deliveries-details-note">Search and status filters apply to the loaded page. Pickup details are not part of the current API response.</p>
+        <p className="deliveries-details-note">Search and status filters apply to the loaded page.</p>
 
         {isPending ? (
           <div className="delivery-skeletons" role="status" aria-label="Loading assigned deliveries">
@@ -144,7 +291,12 @@ const AssignedDeliveries: React.FC = () => {
                   <div><span><CalendarDays size={14} /> Assigned</span><strong>{formatDate(delivery.assignedAt)}</strong></div>
                   <div><span><CalendarDays size={14} /> Scheduled</span><strong>{formatScheduledDate(delivery.scheduledDate)}</strong></div>
                 </div>
-                <div className="assigned-delivery-card-footer"><span>Assignment #{delivery.assignmentId}</span><button className="btn btn-secondary btn-sm" onClick={() => setSelectedDelivery(delivery)}>View details <ArrowRight size={15} /></button></div>
+                <div className="assigned-delivery-actions">
+                  <button className="btn btn-secondary btn-sm" onClick={() => handleSelectDelivery(delivery)}>Manage delivery</button>
+                  {(delivery.status === 'in_transit' || delivery.status === 'out_for_delivery') && (
+                    <Link to="/courier/proof" className="btn btn-primary btn-sm">Complete Delivery</Link>
+                  )}
+                </div>
               </article>
             ))}
           </div>
@@ -169,23 +321,61 @@ const AssignedDeliveries: React.FC = () => {
             <div><dt>Delivery address</dt><dd>{selectedDelivery.deliveryAddress || 'Unavailable'}</dd></div>
             <div><dt>Scheduled date</dt><dd>{formatScheduledDate(selectedDelivery.scheduledDate)}</dd></div>
             <div><dt>Assigned at</dt><dd>{formatDate(selectedDelivery.assignedAt)}</dd></div>
-            <div><dt>Pickup address</dt><dd>Not provided by the current Parcel Service API</dd></div>
           </dl>
-          {nextStatus && <div className="courier-status-actions">
-            <h3>Update delivery status</h3>
-            {nextStatus === 'failed' && <label className="form-group">
-              <span className="form-label">Failure reason</span>
-              <textarea className="form-input" rows={3} maxLength={1000} value={failureReason}
-                onChange={event => setFailureReason(event.target.value)} placeholder="Explain why delivery could not be completed" />
-            </label>}
-            {statusUpdateError && <p role="alert" className="text-danger">{statusUpdateError}</p>}
-            <button className="btn btn-primary" type="button" onClick={() => void updateStatus()}
-              disabled={statusUpdate.isPending || (nextStatus === 'failed' && !failureReason.trim())}>
-              {statusUpdate.isPending ? 'Updating…' : nextStatus === 'failed' ? 'Report failed delivery'
-                : selectedDelivery.status === 'failed' ? 'Retry delivery' : 'Start delivery'}
-            </button>
-            <p className="deliveries-muted">Parcel Service validates status transitions. Delivery completion still requires both proofs.</p>
-          </div>}
+
+          {statusOptions.length > 0 && (
+            <div className="courier-status-actions">
+              <h3>Update delivery status</h3>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                {statusOptions.map(opt => (
+                  <button
+                    key={opt.status}
+                    type="button"
+                    className={`btn btn-sm ${chosenStatus === opt.status ? (opt.isDanger ? 'btn-danger' : 'btn-primary') : 'btn-secondary'}`}
+                    onClick={() => setChosenStatus(opt.status)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              {chosenStatus === 'failed' && (
+                <label className="form-group">
+                  <span className="form-label">Failure reason (required)</span>
+                  <textarea
+                    className="form-input"
+                    rows={3}
+                    maxLength={1000}
+                    value={failureReason}
+                    onChange={event => setFailureReason(event.target.value)}
+                    placeholder="Explain why delivery could not be completed"
+                  />
+                </label>
+              )}
+
+              {statusUpdateError && <p role="alert" className="text-danger">{statusUpdateError}</p>}
+
+              <button
+                className={`btn ${chosenStatus === 'failed' ? 'btn-danger' : 'btn-primary'}`}
+                type="button"
+                onClick={() => void updateStatus()}
+                disabled={statusUpdate.isPending || !chosenStatus || (chosenStatus === 'failed' && !failureReason.trim())}
+              >
+                {statusUpdate.isPending ? 'Updating…' : `Confirm: ${statusOptions.find(o => o.status === chosenStatus)?.label ?? 'Select'}`}
+              </button>
+            </div>
+          )}
+
+          {(selectedDelivery.status === 'in_transit' || selectedDelivery.status === 'out_for_delivery') && (
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+              <p className="deliveries-muted" style={{ marginBottom: 8 }}>
+                Delivery completion requires OTP challenge verification and photo proof.
+              </p>
+              <Link to="/courier/proof" className="btn btn-primary btn-sm">
+                Complete Delivery with Proof
+              </Link>
+            </div>
+          )}
         </div>}
       </Modal>
     </DashboardLayout>

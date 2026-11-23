@@ -39,79 +39,17 @@ const AdminMerchantReviewPage: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [approvedApiKey, setApprovedApiKey] = useState<ApiKeyCreatedResponse | null>(null);
 
+  const [error, setError] = useState<string | null>(null);
+
   const loadMerchants = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await adminMerchantApi.getMerchants(statusFilter, 0, 50);
       setMerchants(res.content || []);
-    } catch {
-      // Mock fallback for offline demonstration
-      setMerchants([
-        {
-          id: 'b1234567-0000-0000-0000-000000000001',
-          userId: 'usr_002',
-          businessName: 'Apex Electronics Ltd',
-          tradeName: 'Apex Store',
-          registrationNumber: 'PV987654',
-          taxIdentificationNumber: 'TIN-445566',
-          businessType: 'PRIVATE_LIMITED',
-          status: 'SUBMITTED',
-          pricingTier: 'STANDARD',
-          primaryContactName: 'Ruwan Perera',
-          primaryContactPhone: '+94 77 123 4567',
-          primaryContactEmail: 'ruwan@apex.lk',
-          contactName: 'Ruwan Perera',
-          contactPhone: '+94 77 123 4567',
-          contactEmail: 'ruwan@apex.lk',
-          pickupStreet: '124 Galle Road',
-          pickupCity: 'Colombo',
-          pickupDistrict: 'Colombo',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          addresses: [
-            {
-              id: 'addr_001',
-              hubName: 'Colombo Central Hub',
-              addressLine1: '124 Galle Road',
-              city: 'Colombo',
-              district: 'Colombo',
-              latitude: 6.9271,
-              longitude: 79.8612,
-              contactPerson: 'Ruwan Perera',
-              contactPhone: '+94 77 123 4567',
-              isPrimaryPickup: true,
-            },
-          ],
-          bankAccount: {
-            id: 'bank_001',
-            bankName: 'Commercial Bank of Ceylon',
-            branchName: 'Kollupitiya',
-            accountNumber: '••••••••1234',
-            accountHolderName: 'Apex Electronics Pvt Ltd',
-            settlementCycle: 'WEEKLY',
-            isVerified: false,
-          },
-          documents: [
-            {
-              id: 'doc_001',
-              documentType: 'BUSINESS_REGISTRATION',
-              documentName: 'BR_Certificate_Apex.pdf',
-              fileUrl: 'https://example.com/docs/br.pdf',
-              verificationStatus: 'PENDING',
-              createdAt: new Date().toISOString(),
-            },
-            {
-              id: 'doc_002',
-              documentType: 'TAX_CERTIFICATE',
-              documentName: 'TIN_Registration.pdf',
-              fileUrl: 'https://example.com/docs/tin.pdf',
-              verificationStatus: 'PENDING',
-              createdAt: new Date().toISOString(),
-            },
-          ],
-          apiCredentials: [],
-        },
-      ]);
+    } catch (err: unknown) {
+      setMerchants([]);
+      setError(err instanceof Error ? err.message : 'Failed to retrieve merchant applications');
     } finally {
       setLoading(false);
     }
@@ -253,6 +191,26 @@ const AdminMerchantReviewPage: React.FC = () => {
         </div>
       </div>
 
+      {error && (
+        <div style={{
+          marginBottom: 20,
+          padding: '12px 16px',
+          borderRadius: 8,
+          backgroundColor: 'rgba(239, 68, 68, 0.12)',
+          border: '1px solid rgba(239, 68, 68, 0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: 'var(--text-primary)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <AlertTriangle size={20} color="var(--danger)" />
+            <span>{error}</span>
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={() => loadMerchants()}>Retry</button>
+        </div>
+      )}
+
       {/* Applications Table */}
       <div className="card">
         <div className="table-wrapper">
@@ -295,7 +253,7 @@ const AdminMerchantReviewPage: React.FC = () => {
                         {m.registrationNumber}
                       </span>
                     </td>
-                    <td style={{ fontSize: 12 }}>{m.businessType.replace('_', ' ')}</td>
+                    <td style={{ fontSize: 12 }}>{(m.businessType || '').replace(/_/g, ' ')}</td>
                     <td>
                       <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: 'var(--bg-hover)', border: '1px solid var(--border)', fontWeight: 600 }}>
                         {m.pricingTier}

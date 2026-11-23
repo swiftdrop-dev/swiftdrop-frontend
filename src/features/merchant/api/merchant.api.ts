@@ -16,7 +16,13 @@ import type {
   UpdateWebhookPayload,
   PageResponse,
   PricingTier,
+  Page,
 } from '../types/merchant.types';
+import type {
+  MerchantOrder,
+  MerchantOrderCreate,
+  OrderQuery,
+} from '../types/merchant-order.types';
 
 // Helper to normalize backend MerchantResponse into frontend MerchantProfile
 function normalizeMerchantProfile(data: any): MerchantProfile {
@@ -181,6 +187,31 @@ export const merchantApi = {
 
   updateWebhook: async (merchantId: string, payload: UpdateWebhookPayload): Promise<void> => {
     await apiClient.put(`/merchants/onboarding/${merchantId}/webhook`, payload);
+  },
+
+  // Orders
+  createOrder: async (data: MerchantOrderCreate, idempotencyKey?: string): Promise<MerchantOrder> => {
+    const headers: Record<string, string> = {};
+    if (idempotencyKey) {
+      headers['Idempotency-Key'] = idempotencyKey;
+    }
+    const res = await apiClient.post<MerchantOrder>('/merchants/orders', data, { headers });
+    return res.data;
+  },
+
+  createBulkOrders: async (orders: MerchantOrderCreate[]): Promise<any> => {
+    const res = await apiClient.post('/merchants/orders/bulk', { orders });
+    return res.data;
+  },
+
+  getOrders: async (query: OrderQuery = { page: 0, size: 20 }): Promise<Page<MerchantOrder>> => {
+    const res = await apiClient.get<Page<MerchantOrder>>('/merchants/orders', { params: query });
+    return res.data;
+  },
+
+  getOrderById: async (id: string): Promise<MerchantOrder> => {
+    const res = await apiClient.get<MerchantOrder>(`/merchants/orders/${encodeURIComponent(id)}`);
+    return res.data;
   },
 };
 

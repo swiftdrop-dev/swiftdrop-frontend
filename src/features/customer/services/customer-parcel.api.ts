@@ -10,6 +10,7 @@ export interface CreateParcelBookingRequest {
   parcelSize?: string;
   fragile?: boolean;
   paymentMethod?: string;
+  totalFee?: number;
 }
 
 export interface ParcelBookingResponse {
@@ -47,7 +48,7 @@ export interface CustomerParcelPageResponse {
 export const PARCEL_API_BASE_URL =
   import.meta.env.VITE_PARCEL_API_BASE_URL
   || import.meta.env.VITE_API_BASE_URL
-  || 'http://localhost:8080/api/v1';
+  || '/api/v1';
 
 export const customerParcelApi = {
   bookParcel: async (request: CreateParcelBookingRequest): Promise<ParcelBookingResponse> => {
