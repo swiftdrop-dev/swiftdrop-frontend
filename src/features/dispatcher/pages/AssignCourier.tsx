@@ -36,17 +36,24 @@ const AssignCourier: React.FC = () => {
   const [assigningCourierId, setAssigningCourierId] = useState<string | null>(null);
   const [dispatcherNotes, setDispatcherNotes] = useState<string>('');
 
-  // Fetch unassigned queue from backend, fallback to mock if empty/offline
-  const loadUnassignedQueue = useCallback(async () => {
-    setLoading(true);
+  // Fetch unassigned queue from backend, fallback to mock if offline
+  const loadUnassignedQueue = useCallback(async (isBackground = false) => {
+    if (!isBackground) {
+      setLoading(true);
+    }
     try {
       const zoneParam = selectedZone === 'ALL' ? undefined : selectedZone;
       const res = await dispatchApi.getUnassignedQueue(zoneParam, 0, 50);
-      if (res && res.content && res.content.length > 0) {
+      if (res && Array.isArray(res.content)) {
         setJobs(res.content);
       } else {
-        // Fallback to mock data converted to DispatchJobSummary format
-        const mockAsJobs: DispatchJobSummary[] = MOCK_PARCELS
+        setJobs([]);
+      }
+    } catch {
+      // Offline fallback only when backend is unreachable and jobs is empty
+      setJobs(prev => {
+        if (prev.length > 0) return prev;
+        return MOCK_PARCELS
           .filter(p => p.status === 'pending')
           .map(p => ({
             id: p.id,
@@ -68,40 +75,20 @@ const AssignCourier: React.FC = () => {
             totalFee: p.totalFee,
             createdAt: p.createdAt,
           }));
-        setJobs(mockAsJobs);
-      }
-    } catch {
-      // Offline fallback
-      const mockAsJobs: DispatchJobSummary[] = MOCK_PARCELS
-        .filter(p => p.status === 'pending')
-        .map(p => ({
-          id: p.id,
-          parcelId: p.id,
-          trackingNumber: p.trackingNumber,
-          priority: (p.fragile ? 'HIGH' : 'NORMAL') as DispatchPriority,
-          dispatchStatus: 'UNASSIGNED',
-          pickupZoneCode: 'ZONE-CMB-CENTRAL',
-          destinationZoneCode: 'ZONE-CMB-SOUTH',
-          pickupCity: p.pickupAddress.city,
-          pickupDistrict: p.pickupAddress.district || 'Colombo',
-          destinationCity: p.recipientAddress.city,
-          destinationDistrict: p.recipientAddress.district || 'Colombo',
-          pickupLatitude: 6.9271,
-          pickupLongitude: 79.8612,
-          destinationLatitude: 6.9034,
-          destinationLongitude: 79.8550,
-          requiredVehicleType: 'MOTORCYCLE',
-          totalFee: p.totalFee,
-          createdAt: p.createdAt,
-        }));
-      setJobs(mockAsJobs);
+      });
     } finally {
-      setLoading(false);
+      if (!isBackground) {
+        setLoading(false);
+      }
     }
   }, [selectedZone]);
 
   useEffect(() => {
     loadUnassignedQueue();
+    const interval = setInterval(() => {
+      loadUnassignedQueue(true);
+    }, 10000);
+    return () => clearInterval(interval);
   }, [loadUnassignedQueue]);
 
   // Open Proximity Matching Modal
@@ -227,7 +214,7 @@ const AssignCourier: React.FC = () => {
         </div>
         <button
           className="btn btn-secondary btn-sm"
-          onClick={loadUnassignedQueue}
+          onClick={() => loadUnassignedQueue(false)}
           disabled={loading}
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
         >

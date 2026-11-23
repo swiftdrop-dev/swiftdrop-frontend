@@ -3,10 +3,11 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Package, LayoutDashboard, PlusCircle, List, FileText,
   Truck, MapPin, CheckSquare, BarChart2, Users,
-  Settings, LogOut, Menu, X, Bell, ChevronDown, DollarSign,
+  Settings, LogOut, Menu, X, Bell, ChevronDown, DollarSign, Webhook,
 } from 'lucide-react';
 import { useAuth } from '../../features/auth/context/AuthContext';
 import type { UserRole } from '../../types/global.types';
+import { NotificationBellPopover } from '../../features/notifications/components/NotificationBellPopover';
 
 interface NavItem {
   to: string;
@@ -23,6 +24,7 @@ const NAV_BY_ROLE: Record<UserRole, { section: string; items: NavItem[] }[]> = {
         { to: '/customer', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
         { to: '/customer/book', icon: <PlusCircle size={18} />, label: 'Book Parcel' },
         { to: '/customer/parcels', icon: <List size={18} />, label: 'My Parcels' },
+        { to: '/customer/notifications', icon: <Bell size={18} />, label: 'Notifications' },
         { to: '/track', icon: <MapPin size={18} />, label: 'Track Parcel' },
       ],
     },
@@ -38,6 +40,7 @@ const NAV_BY_ROLE: Record<UserRole, { section: string; items: NavItem[] }[]> = {
         { to: '/merchant/onboarding', icon: <CheckSquare size={18} />, label: 'Onboarding' },
         { to: '/merchant/profile', icon: <Users size={18} />, label: 'Business Profile' },
         { to: '/merchant/api-keys', icon: <Settings size={18} />, label: 'API Keys' },
+        { to: '/merchant/webhooks', icon: <Webhook size={18} />, label: 'Webhooks' },
         { to: '/merchant/parcels', icon: <List size={18} />, label: 'All Shipments' },
         { to: '/track', icon: <MapPin size={18} />, label: 'Track Parcel' },
       ],
@@ -59,10 +62,8 @@ const NAV_BY_ROLE: Record<UserRole, { section: string; items: NavItem[] }[]> = {
       section: 'Operations',
       items: [
         { to: '/dispatcher', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
-        { to: '/dispatcher/parcels', icon: <Package size={18} />, label: 'All Parcels', badge: 5 },
+        { to: '/dispatcher/parcels', icon: <Package size={18} />, label: 'All Parcels' },
         { to: '/dispatcher/assign', icon: <Users size={18} />, label: 'Assign Courier' },
-        { to: '/admin/merchants', icon: <CheckSquare size={18} />, label: 'Merchant Review' },
-        { to: '/admin/pricing', icon: <DollarSign size={18} />, label: 'Pricing & Zones' },
         { to: '/dispatcher/reports', icon: <BarChart2 size={18} />, label: 'Reports' },
         { to: '/track', icon: <MapPin size={18} />, label: 'Track Parcel' },
       ],
@@ -72,9 +73,11 @@ const NAV_BY_ROLE: Record<UserRole, { section: string; items: NavItem[] }[]> = {
     {
       section: 'Administration',
       items: [
+        { to: '/admin/users', icon: <Users size={18} />, label: 'User Management' },
         { to: '/admin/merchants', icon: <CheckSquare size={18} />, label: 'Merchant Review' },
         { to: '/admin/pricing', icon: <DollarSign size={18} />, label: 'Pricing & Zones' },
         { to: '/dispatcher', icon: <LayoutDashboard size={18} />, label: 'Dispatch Console' },
+        { to: '/dispatcher/reports', icon: <BarChart2 size={18} />, label: 'Reports' },
         { to: '/track', icon: <MapPin size={18} />, label: 'Track Parcel' },
       ],
     },
@@ -94,7 +97,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   if (!user) return null;
 
   const navGroups = NAV_BY_ROLE[user.role] ?? [];
-  const initials = user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  const displayName = user.name || user.email || 'User';
+  const initials = displayName.split(' ').map(n => n[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || 'U';
 
   const handleLogout = () => {
     logout();
@@ -206,20 +210,14 @@ export const Header: React.FC<HeaderProps> = ({ onMenuToggle, title }) => {
         <span className="header-live"><span className="live-dot" /> {today}</span>
 
         {/* Notifications */}
-        <button className="header-icon-btn" aria-label="Notifications">
-          <Bell size={16} />
-          <span style={{
-            position: 'absolute', top: 7, right: 7, width: 7, height: 7,
-            background: 'var(--signal)', border: '1.5px solid var(--bg-raised)',
-          }} />
-        </button>
+        <NotificationBellPopover />
 
         {/* User menu */}
         <div style={{ position: 'relative' }}>
           <button className="header-user-btn" onClick={() => setShowDropdown(p => !p)}>
-            <div className="avatar-ink">{user?.name.slice(0, 2).toUpperCase()}</div>
+            <div className="avatar-ink">{(user?.name || user?.email || 'U').slice(0, 2).toUpperCase()}</div>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-              {user?.name.split(' ')[0]}
+              {(user?.name || user?.email || 'User').split(' ')[0]}
             </span>
             <ChevronDown size={14} />
           </button>
@@ -227,7 +225,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuToggle, title }) => {
           {showDropdown && (
             <div className="dropdown">
               <div style={{ padding: '8px 10px 10px', borderBottom: '1px dashed var(--border-strong)', marginBottom: 6 }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{user?.name}</p>
+                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{user?.name || user?.email || 'User'}</p>
                 <p className="eyebrow" style={{ marginTop: 2 }}>{user?.role}</p>
               </div>
               <button

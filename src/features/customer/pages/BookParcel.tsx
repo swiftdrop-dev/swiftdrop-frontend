@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Package,
@@ -13,12 +13,19 @@ import {
   Briefcase,
   Archive,
   Boxes,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 
 import DashboardLayout from "../../../components/layout/DashboardLayout";
 import { useToast } from "../../../components/shared/SharedComponents";
 import { useAuth } from "../../auth/context/AuthContext";
 import { customerParcelApi } from "../services/customer-parcel.api";
+import {
+  pricingService,
+  mapDistrictToZoneCode,
+  type FeeEstimateResponse,
+} from "../../../services/pricing.service";
 
 import type {
   ParcelSize,
@@ -119,7 +126,12 @@ const BookParcel: React.FC = () => {
     fragile: false,
     specialInstructions: "",
     paymentMethod: "cod" as "cod" | "online",
+    deliverySpeed: "STANDARD" as "STANDARD" | "EXPRESS" | "BULK",
   });
+
+  const [estimate, setEstimate] = useState<FeeEstimateResponse | null>(null);
+  const [estimateLoading, setEstimateLoading] = useState(false);
+  const [estimateError, setEstimateError] = useState<string | null>(null);
 
   function update<K extends keyof typeof form>(
     key: K,
@@ -131,11 +143,54 @@ const BookParcel: React.FC = () => {
     }));
   }
 
+  const calculateFee = useCallback(async () => {
+    const weightVal = Number(form.weight);
+    if (!weightVal || weightVal <= 0) {
+      setEstimate(null);
+      return;
+    }
+
+    setEstimateLoading(true);
+    setEstimateError(null);
+
+    try {
+      const fromZoneCode = mapDistrictToZoneCode(form.pickupDistrict);
+      const toZoneCode = mapDistrictToZoneCode(form.deliveryDistrict);
+
+      const res = await pricingService.estimateFee({
+        fromZoneCode,
+        toZoneCode,
+        weightKg: weightVal,
+        deliveryType: form.deliverySpeed,
+      });
+
+      setEstimate(res);
+    } catch (err: any) {
+      setEstimateError(err.message || "Failed to calculate delivery fee");
+      setEstimate(null);
+    } finally {
+      setEstimateLoading(false);
+    }
+  }, [form.pickupDistrict, form.deliveryDistrict, form.weight, form.deliverySpeed]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void calculateFee();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [calculateFee]);
+
   const handleSubmit = async () => {
     if (submittingRef.current) return;
 
     if (!user) {
       setError("Please log in before booking a parcel.");
+      return;
+    }
+
+    if (!estimate || estimateLoading) {
+      setError("Please ensure a valid shipping fee estimate is calculated before confirming.");
       return;
     }
 
@@ -164,6 +219,7 @@ const BookParcel: React.FC = () => {
         parcelSize: form.size.toUpperCase(),
         fragile: form.fragile,
         paymentMethod: form.paymentMethod.toUpperCase(),
+        totalFee: estimate.totalEstimatedFee,
       };
 
       const booked = await customerParcelApi.bookParcel(bookingReq);
@@ -841,6 +897,30 @@ const BookParcel: React.FC = () => {
                   </div>
                 </div>
 
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label className="form-label" htmlFor="deliverySpeed">
+                    Delivery Service Level *
+                  </label>
+                  <select
+                    id="deliverySpeed"
+                    className="form-input"
+                    value={form.deliverySpeed}
+                    onChange={(event) =>
+                      update(
+                        "deliverySpeed",
+                        event.target.value as "STANDARD" | "EXPRESS" | "BULK",
+                      )
+                    }
+                  >
+                    <option value="STANDARD">Standard Delivery (1–2 Days)</option>
+                    <option value="EXPRESS">Express Priority (Next Day · 1.5x Rate)</option>
+                    <option value="BULK">Heavy Cargo & Bulk (&gt;10kg · 15% Weight Discount)</option>
+                  </select>
+                  <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+                    Rates and delivery strategy are calculated dynamically via backend Strategy Pattern.
+                  </p>
+                </div>
+
                 <div className="form-group">
                   <label
                     className="form-label"
@@ -1118,6 +1198,103 @@ const BookParcel: React.FC = () => {
                       </p>
                     )}
                   </div>
+
+                  <div
+                    style={{
+                      background: "var(--bg-overlay)",
+                      borderRadius: 14,
+                      padding: 16,
+                      fontSize: 13,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <p
+                        style={{
+                          fontWeight: 700,
+                          color: "var(--text-muted)",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          fontSize: 11,
+                          margin: 0,
+                        }}
+                      >
+                        Pricing & Service Strategy
+                      </p>
+                      {estimate && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "var(--primary-dark)",
+                            background: "var(--primary-tint)",
+                            padding: "3px 8px",
+                            borderRadius: 6,
+                          }}
+                        >
+                          {estimate.strategyApplied}
+                        </span>
+                      )}
+                    </div>
+
+                    {estimateLoading ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-secondary)", padding: "10px 0" }}>
+                        <RefreshCw size={14} className="animate-spin" />
+                        <span>Calculating dynamic delivery fee...</span>
+                      </div>
+                    ) : estimateError ? (
+                      <div
+                        style={{
+                          padding: "10px 12px",
+                          borderRadius: 8,
+                          background: "var(--danger-bg)",
+                          border: "1px solid var(--danger-border)",
+                          color: "var(--danger)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 8,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <AlertCircle size={14} />
+                          <span>{estimateError}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => void calculateFee()}
+                          style={{ fontSize: 11, padding: "2px 8px" }}
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    ) : estimate ? (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                        <div>
+                          <p style={{ color: "var(--text-muted)", marginBottom: 2 }}>Base Fee</p>
+                          <p style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                            Rs. {estimate.baseFee.toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p style={{ color: "var(--text-muted)", marginBottom: 2 }}>Per-Kg Rate ({form.weight} kg)</p>
+                          <p style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                            Rs. {(estimate.perKgFee * Number(form.weight)).toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p style={{ color: "var(--text-muted)", marginBottom: 2 }}>Total Delivery Fee</p>
+                          <p style={{ color: "var(--success)", fontWeight: 700, fontSize: 16 }}>
+                            Rs. {estimate.totalEstimatedFee.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p style={{ color: "var(--warning)", margin: 0 }}>
+                        Fee calculation pending. Please verify package details.
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -1160,7 +1337,7 @@ const BookParcel: React.FC = () => {
                 <button
                   type="submit"
                   className="btn btn-success"
-                  disabled={submitting}
+                  disabled={submitting || estimateLoading || !estimate}
                 >
                   {submitting ? (
                     <>
@@ -1186,39 +1363,136 @@ const BookParcel: React.FC = () => {
           </form>
         </div>
 
-        {/* Fee estimate */}
+        {/* Fee estimate sidebar */}
         <div className="customer-fee-sidebar">
           <div className="fee-box">
-            <p
-              style={{
-                fontWeight: 700,
-                fontSize: 14,
-                color: "var(--text-primary)",
-                marginBottom: 16,
-              }}
-            >
-              Fee Estimate
-            </p>
-
-            <p className="customer-note" style={{ marginBottom: 16 }}>
-              Fee calculated upon pricing service availability.
-            </p>
-
-            <div className="fee-row-total">
-              <span>Total Fee</span>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <p
+                style={{
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: "var(--text-primary)",
+                  margin: 0,
+                }}
+              >
+                Fee Estimate
+              </p>
               <span
                 style={{
-                  fontSize: 12,
+                  fontSize: 10,
                   fontWeight: 600,
-                  color: "#d97706",
-                  background: "#fef3c7",
-                  padding: "4px 8px",
+                  color: "var(--primary-dark)",
+                  background: "var(--primary-tint)",
+                  padding: "2px 6px",
                   borderRadius: 6,
                 }}
               >
-                Pending Pricing Service
+                Strategy Pattern
               </span>
             </div>
+
+            {estimateLoading && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "16px 0", color: "var(--text-secondary)", fontSize: 13 }}>
+                <RefreshCw size={14} className="animate-spin" />
+                <span>Calculating dynamic rate...</span>
+              </div>
+            )}
+
+            {estimateError && !estimateLoading && (
+              <div style={{ marginBottom: 16 }}>
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    background: "var(--danger-bg)",
+                    border: "1px solid var(--danger-border)",
+                    color: "var(--danger)",
+                    fontSize: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginBottom: 8,
+                  }}
+                >
+                  <AlertCircle size={14} />
+                  <span>{estimateError}</span>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => void calculateFee()}
+                  style={{ width: "100%", fontSize: 12 }}
+                >
+                  Retry Calculation
+                </button>
+              </div>
+            )}
+
+            {estimate && !estimateLoading && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--text-secondary)" }}>
+                  <span>Base Rate</span>
+                  <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                    Rs. {estimate.baseFee.toFixed(2)}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--text-secondary)" }}>
+                  <span>Per-kg Rate ({form.weight} kg)</span>
+                  <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                    Rs. {(estimate.perKgFee * Number(form.weight)).toFixed(2)}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--text-secondary)" }}>
+                  <span>Strategy Applied</span>
+                  <span style={{ fontWeight: 600, color: "var(--primary-dark)", fontSize: 11 }}>
+                    {estimate.strategyApplied}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    borderTop: "1px solid var(--border)",
+                    paddingTop: 10,
+                    marginTop: 4,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
+                  }}
+                >
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>Total Fee</span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 18,
+                      fontWeight: 800,
+                      color: "var(--success)",
+                    }}
+                  >
+                    Rs. {estimate.totalEstimatedFee.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {!estimate && !estimateLoading && !estimateError && (
+              <div className="fee-row-total">
+                <span>Total Fee</span>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#d97706",
+                    background: "#fef3c7",
+                    padding: "4px 8px",
+                    borderRadius: 6,
+                  }}
+                >
+                  Pending Calculation
+                </span>
+              </div>
+            )}
 
             <div
               style={{
@@ -1232,7 +1506,7 @@ const BookParcel: React.FC = () => {
                 fontWeight: 500,
               }}
             >
-              Est. delivery in <strong>1–3 days</strong>
+              Est. delivery in <strong>{estimate?.estimatedDeliveryDays ? `${estimate.estimatedDeliveryDays} business days` : "1–3 days"}</strong>
             </div>
           </div>
         </div>

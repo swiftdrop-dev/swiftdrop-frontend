@@ -7,9 +7,11 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  googleLogin: (idToken: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
 }
+
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -135,12 +137,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  // ── Google OAuth Login ────────────────────────────────────
+
+  const googleLogin = useCallback(async (idToken: string) => {
+    try {
+      const data = await authService.googleLogin(idToken);
+
+      const loggedInUser: User = {
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        role: data.role,
+      };
+
+      localStorage.setItem('swiftdrop_token', data.token);
+      localStorage.setItem('swiftdrop_user', JSON.stringify(loggedInUser));
+      setUser(loggedInUser);
+
+      return { success: true };
+    } catch (_error) {
+      return {
+        success: false,
+        error: extractErrorMessage(_error, 'Google authentication failed. Please try again.'),
+      };
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout, register }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, googleLogin, logout, register }}>
       {children}
     </AuthContext.Provider>
   );
 };
+
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);

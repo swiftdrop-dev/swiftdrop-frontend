@@ -1,10 +1,12 @@
 export type MerchantStatus = 'DRAFT' | 'PENDING' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
 export type PricingTier = 'STANDARD' | 'SILVER' | 'GOLD' | 'ENTERPRISE';
 export type BusinessType =
+  | 'INDIVIDUAL'
   | 'SOLE_PROPRIETORSHIP'
   | 'PARTNERSHIP'
   | 'PRIVATE_LIMITED'
   | 'PUBLIC_LIMITED'
+  | 'RETAIL'
   | 'OTHER';
 export type ContactType = 'PRIMARY' | 'FINANCE' | 'OPERATIONS' | 'TECHNICAL';
 export type DocumentType =
@@ -193,8 +195,10 @@ export interface UploadDocumentPayload {
 }
 
 export interface GenerateApiKeyPayload {
+  label?: string;
   environment?: string;
   expiryDays?: number;
+  expiresInDays?: number;
 }
 
 export interface UpdateWebhookPayload {

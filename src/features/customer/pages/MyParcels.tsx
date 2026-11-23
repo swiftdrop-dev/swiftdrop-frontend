@@ -14,7 +14,8 @@ import {
 import { customerParcelApi, type ParcelBookingResponse } from "../services/customer-parcel.api";
 import { downloadReceipt } from "../services/receipt";
 
-import type { Parcel, ParcelStatus, ParcelSize, Address } from "../../../types/global.types";
+import type { Parcel, ParcelStatus, ParcelSize, Address, StatusEvent } from "../../../types/global.types";
+import { trackingApi } from "../../tracking/api/tracking.api";
 import "../customer.css";
 
 function parseAddress(addrStr?: string): Address {
@@ -98,6 +99,72 @@ const MyParcels: React.FC = () => {
 
   const [selectedParcel, setSelectedParcel] =
     useState<Parcel | null>(null);
+  const [timelineEvents, setTimelineEvents] = useState<StatusEvent[]>([]);
+  const [trackingLoading, setTrackingLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selectedParcel) {
+      setTimelineEvents([]);
+      return;
+    }
+    let isCancelled = false;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+    const fetchTimeline = async (isSilent = false) => {
+      try {
+        if (!isSilent) {
+          setTrackingLoading(true);
+        }
+        let trackingData;
+        try {
+          trackingData = await trackingApi.getCustomerTracking(selectedParcel.trackingNumber);
+        } catch {
+          trackingData = await trackingApi.getPublicTracking(selectedParcel.trackingNumber);
+        }
+        if (!isCancelled && trackingData?.timeline) {
+          const events = trackingData.timeline.map((item) => ({
+            status: mapStatus(item.status),
+            timestamp: item.timestamp,
+            note: item.description || item.title,
+            location: item.location || undefined,
+          }));
+          if (events.length > 0) {
+            setTimelineEvents(events);
+          } else {
+            setTimelineEvents(selectedParcel.statusHistory);
+          }
+          if (trackingData.status) {
+            const mapped = mapStatus(trackingData.status);
+            setSelectedParcel((prev) => prev && prev.status !== mapped ? { ...prev, status: mapped } : prev);
+          }
+        }
+      } catch {
+        if (!isCancelled) {
+          setTimelineEvents(selectedParcel.statusHistory);
+        }
+      } finally {
+        if (!isCancelled && !isSilent) {
+          setTrackingLoading(false);
+        }
+      }
+    };
+
+    fetchTimeline(false);
+
+    const isTerminal = ["delivered", "cancelled", "returned"].includes(selectedParcel.status);
+    if (!isTerminal) {
+      pollTimer = setInterval(() => {
+        fetchTimeline(true);
+      }, 15000);
+    }
+
+    return () => {
+      isCancelled = true;
+      if (pollTimer) {
+        clearInterval(pollTimer);
+      }
+    };
+  }, [selectedParcel?.trackingNumber]);
 
   const [showReceipt, setShowReceipt] =
     useState<Parcel | null>(null);
@@ -191,16 +258,22 @@ const MyParcels: React.FC = () => {
     setPage(1);
   }
 
+  const [downloadingReceipt, setDownloadingReceipt] = useState(false);
+
   async function handleReceiptDownload() {
-    if (!showReceipt) return;
+    if (!showReceipt || downloadingReceipt) return;
 
     try {
+      setDownloadingReceipt(true);
       setReceiptError("");
       await downloadReceipt(showReceipt);
-    } catch {
+      showToast(`Receipt for ${showReceipt.trackingNumber} downloaded successfully!`, "success");
+    } catch (err: any) {
       setReceiptError(
-        "Unable to download receipt. Please try again.",
+        err.message || "Unable to download receipt. Please try again.",
       );
+    } finally {
+      setDownloadingReceipt(false);
     }
   }
 
@@ -608,8 +681,14 @@ const MyParcels: React.FC = () => {
               </p>
             </div>
 
+            {trackingLoading && (
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
+                Loading live tracking events...
+              </p>
+            )}
+
             <StatusTimeline
-              history={selectedParcel.statusHistory}
+              history={timelineEvents.length > 0 ? timelineEvents : selectedParcel.statusHistory}
               currentStatus={selectedParcel.status}
             />
           </>
@@ -623,10 +702,11 @@ const MyParcels: React.FC = () => {
         footer={
           <button
             className="btn btn-primary btn-sm"
+            disabled={downloadingReceipt}
             onClick={handleReceiptDownload}
           >
             <Download size={14} />
-            Download PDF
+            {downloadingReceipt ? "Downloading..." : "Download Official PDF"}
           </button>
         }
       >

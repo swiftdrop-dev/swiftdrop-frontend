@@ -3,7 +3,7 @@ import { Plus, Trash2, Upload, CheckCircle } from 'lucide-react';
 import DashboardLayout from '../../../components/layout/DashboardLayout';
 import { useToast } from '../../../components/shared/SharedComponents';
 import type { ParcelSize } from '../../../types/global.types';
-import { MOCK_PARCELS } from '../../../lib/mockData';
+import { merchantApi } from '../api/merchant.api';
 
 interface BulkRow {
   id: string;
@@ -17,7 +17,7 @@ interface BulkRow {
   paymentMethod: 'cod' | 'online';
 }
 
-const DISTRICTS = ['Colombo','Gampaha','Kalutara','Kandy','Galle','Matara','Jaffna','Kandy','Kurunegala'];
+const DISTRICTS = ['Colombo','Gampaha','Kalutara','Kandy','Galle','Matara','Jaffna','Kurunegala'];
 
 const emptyRow = (): BulkRow => ({
   id: crypto.randomUUID(), recipientName: '', recipientPhone: '',
@@ -41,28 +41,40 @@ const BulkBooking: React.FC = () => {
     const valid = rows.every(r => r.recipientName && r.recipientPhone && r.deliveryAddress);
     if (!valid) { showToast('Please fill all required fields.', 'error'); return; }
     setSubmitting(true);
-    await new Promise(r => setTimeout(r, 1200));
 
-    rows.forEach(row => {
-      MOCK_PARCELS.unshift({
-        id: `prc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        trackingNumber: `SWF-2024-${String(200000 + MOCK_PARCELS.length + 1).slice(1)}`,
-        status: 'pending', senderId: 'usr_002', senderName: 'Lanka Traders',
-        senderPhone: '011-5678900', senderType: 'merchant',
-        recipientName: row.recipientName, recipientPhone: row.recipientPhone,
-        recipientAddress: { street: row.deliveryAddress, city: row.district, district: row.district },
-        pickupAddress: { street: '78 Industrial Zone', city: 'Colombo', district: 'Colombo' },
-        description: row.description, weight: row.weight, size: row.size, fragile: false,
-        deliveryFee: 350, totalFee: 350, paymentStatus: 'pending',
-        paymentMethod: row.paymentMethod, createdAt: new Date().toISOString(),
-        estimatedDeliveryDate: new Date(Date.now() + 172800000).toISOString().slice(0, 10),
-        statusHistory: [{ status: 'pending', timestamp: new Date().toISOString(), note: 'Bulk booking import' }],
-      } as any);
-    });
+    const ordersToCreate = rows.map((row, idx) => ({
+      merchantOrderRef: `BULK-${Date.now()}-${idx + 1}`,
+      recipient: {
+        name: row.recipientName,
+        phone: row.recipientPhone,
+      },
+      pickupAddress: {
+        street: 'Main Warehouse',
+        city: 'Colombo',
+        district: 'Colombo',
+      },
+      deliveryAddress: {
+        street: row.deliveryAddress,
+        city: row.district,
+        district: row.district,
+      },
+      description: row.description || 'Bulk order package',
+      weightKg: Number(row.weight) || 1,
+      size: (row.size ? row.size.toUpperCase() : 'STANDARD') as any,
+      fragile: false,
+      paymentMethod: (row.paymentMethod ? row.paymentMethod.toUpperCase() : 'COD') as any,
+    }));
 
-    setSubmitting(false);
-    setSubmitted(true);
-    showToast(`${rows.length} parcel(s) booked successfully!`, 'success');
+    try {
+      const res = await merchantApi.createBulkOrders(ordersToCreate);
+      setSubmitting(false);
+      setSubmitted(true);
+      const successCount = res?.successCount ?? ordersToCreate.length;
+      showToast(`${successCount} parcel(s) booked successfully!`, 'success');
+    } catch (err: any) {
+      setSubmitting(false);
+      showToast(err?.response?.data?.message || err?.message || 'Failed to submit bulk booking', 'error');
+    }
   };
 
   if (submitted) {
@@ -80,7 +92,7 @@ const BulkBooking: React.FC = () => {
             <button className="btn btn-secondary" onClick={() => { setRows([emptyRow()]); setSubmitted(false); }}>
               New Bulk Booking
             </button>
-            <a href="/merchant/parcels" className="btn btn-primary">View Shipments</a>
+            <a href="/merchant/orders" className="btn btn-primary">View Shipments</a>
           </div>
         </div>
       </DashboardLayout>

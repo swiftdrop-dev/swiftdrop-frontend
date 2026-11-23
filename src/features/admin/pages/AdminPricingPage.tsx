@@ -44,8 +44,8 @@ export const AdminPricingPage: React.FC = () => {
           return [];
         }),
       ]);
-      setZones(zonesData || []);
-      setRates(ratesData || []);
+      setZones(Array.isArray(zonesData) ? zonesData : []);
+      setRates(Array.isArray(ratesData) ? ratesData : []);
     } catch (err: any) {
       console.error('Error loading pricing data:', err);
       showToast('Error loading zones and pricing rates', 'error');
@@ -229,7 +229,7 @@ export const AdminPricingPage: React.FC = () => {
                 borderRadius: 12,
               }}
             >
-              {zones.length} {zones.length === 1 ? 'Zone' : 'Zones'}
+              {(Array.isArray(zones) ? zones.length : 0)} {(Array.isArray(zones) && zones.length === 1) ? 'Zone' : 'Zones'}
             </span>
           </div>
 
@@ -244,14 +244,14 @@ export const AdminPricingPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {loading && zones.length === 0 ? (
+                {loading && (!Array.isArray(zones) || zones.length === 0) ? (
                   <tr>
                     <td colSpan={4} style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)' }}>
                       <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 8px', color: 'var(--primary)' }} />
                       <p style={{ fontSize: 13 }}>Loading delivery zones...</p>
                     </td>
                   </tr>
-                ) : zones.length === 0 ? (
+                ) : (!Array.isArray(zones) || zones.length === 0) ? (
                   <tr>
                     <td colSpan={4} style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)' }}>
                       No coverage zones configured yet.
@@ -319,7 +319,7 @@ export const AdminPricingPage: React.FC = () => {
               borderRadius: 12,
             }}
           >
-            {rates.length} {rates.length === 1 ? 'Route' : 'Routes'}
+            {(Array.isArray(rates) ? rates.length : 0)} {(Array.isArray(rates) && rates.length === 1) ? 'Route' : 'Routes'}
           </span>
         </div>
 
@@ -337,14 +337,14 @@ export const AdminPricingPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {loading && rates.length === 0 ? (
+              {loading && (!Array.isArray(rates) || rates.length === 0) ? (
                 <tr>
                   <td colSpan={7} style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
                     <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 8px', color: 'var(--primary)' }} />
                     <p style={{ fontSize: 13 }}>Loading pricing matrix...</p>
                   </td>
                 </tr>
-              ) : rates.length === 0 ? (
+              ) : (!Array.isArray(rates) || rates.length === 0) ? (
                 <tr>
                   <td colSpan={7} style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
                     No rate entries found for configured zones.
