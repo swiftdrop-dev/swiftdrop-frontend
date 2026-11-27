@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 import {
@@ -63,6 +63,7 @@ const DEMO_ACCOUNTS: {
 
 const LoginPage: React.FC = () => {
   const { login, googleLogin, isAuthenticated, user } = useAuth();
+  const [searchParams] = useSearchParams();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -81,7 +82,9 @@ const LoginPage: React.FC = () => {
       admin: '/admin/merchants',
     };
 
-    return <Navigate to={redirects[user.role] ?? '/'} replace />;
+    const requested = searchParams.get('return');
+    const safeReturn = requested && requested.startsWith('/') && !requested.startsWith('//') ? requested : null;
+    return <Navigate to={safeReturn ?? redirects[user.role] ?? '/'} replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

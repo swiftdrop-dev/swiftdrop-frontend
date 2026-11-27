@@ -296,7 +296,7 @@ export const NotificationBellPopover: React.FC = () => {
 
                     {item.trackingNumber && (
                       <Link
-                        to={`/track?number=${item.trackingNumber}`}
+                        to={`/track?q=${encodeURIComponent(item.trackingNumber)}`}
                         onClick={() => setIsOpen(false)}
                         style={{
                           fontSize: 11,
@@ -376,7 +376,7 @@ export const NotificationBellPopover: React.FC = () => {
             <button
               onClick={() => {
                 setIsOpen(false);
-                navigate('/customer/notifications');
+                navigate('/notifications');
               }}
               style={{
                 background: 'none',

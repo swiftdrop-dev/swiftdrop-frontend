@@ -182,13 +182,19 @@ export function liveIntegration(accountId: string): MerchantIntegration {
           primaryContactPhone: data.contactPhone,
         });
       },
-      update: async (_data) => {
+      update: async (data) => {
         const profile = await merchantApi.getMyProfile();
         return await merchantApi.updateProfile(profile.id, {
           businessName: profile.businessName,
           tradeName: profile.tradeName,
           taxId: profile.taxIdentificationNumber || profile.taxId,
           businessType: profile.businessType,
+          contactName: data.contactName,
+          contactEmail: data.contactEmail,
+          contactPhone: data.contactPhone,
+          pickupStreet: data.pickupStreet,
+          pickupCity: data.pickupCity,
+          pickupDistrict: data.pickupDistrict,
         });
       },
     },

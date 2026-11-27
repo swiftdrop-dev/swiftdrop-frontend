@@ -114,7 +114,7 @@ describe('Customer Notifications Feature', () => {
       // Verify tracking link exists
       const trackLink = screen.getByRole('link', { name: /Track Parcel \(SWD-12345\)/i });
       expect(trackLink).toBeInTheDocument();
-      expect(trackLink.getAttribute('href')).toBe('/track?number=SWD-12345');
+      expect(trackLink.getAttribute('href')).toBe('/track?q=SWD-12345');
 
       // Verify simulated provider tags
       expect(screen.getAllByText(/Simulated EMAIL/i).length).toBeGreaterThanOrEqual(1);

@@ -26,27 +26,41 @@ export interface DispatchJobSummary {
   pickupDistrict: string;
   destinationCity: string;
   destinationDistrict: string;
-  pickupLatitude: number;
-  pickupLongitude: number;
-  destinationLatitude: number;
-  destinationLongitude: number;
+  pickupLatitude: number | null;
+  pickupLongitude: number | null;
+  destinationLatitude: number | null;
+  destinationLongitude: number | null;
   requiredVehicleType: VehicleType;
-  totalFee: number;
+  totalFee: number | null;
   createdAt: string;
+  deliveryCity?: string;
+  zoneCode?: string;
+  status?: string;
+  courierId?: string | null;
 }
 
 export interface CourierCandidate {
   courierId: string;
   courierName: string;
   courierPhone: string;
-  vehicleType: VehicleType;
-  currentLatitude: number;
-  currentLongitude: number;
+  vehicleType: string;
   distanceKm: number;
-  estimatedArrivalMinutes: number;
-  rating: number;
-  activeDeliveries: number;
-  isAvailable: boolean;
+  activeDeliveriesCount: number;
+  maxCapacity: number;
+  matchScore: number;
+}
+
+export interface DispatchJobListItem {
+  id: string;
+  parcelId: string;
+  trackingNumber: string;
+  courierId: string | null;
+  pickupCity: string | null;
+  deliveryCity: string | null;
+  status: string;
+  createdAt: string;
+  courierLatitude?: number | null;
+  courierLongitude?: number | null;
 }
 
 export interface DispatchAssignment {

@@ -98,6 +98,12 @@ export const merchantApi = {
       businessType: payload.businessType,
       webhookUrl: payload.webhookUrl,
       webhookSecret: payload.webhookSecret,
+      contactName: payload.contactName,
+      contactEmail: payload.contactEmail,
+      contactPhone: payload.contactPhone,
+      pickupStreet: payload.pickupStreet,
+      pickupCity: payload.pickupCity,
+      pickupDistrict: payload.pickupDistrict,
     };
     const res = await apiClient.put<{ success: boolean; data: any }>(
       `/merchants/onboarding/${merchantId}/profile`,

@@ -70,6 +70,10 @@ vi.mock("lucide-react", () => {
     Globe: Icon,
     Activity: Icon,
     Code: Icon,
+    UserCheck: Icon,
+    Zap: Icon,
+    Navigation: Icon,
+    ShieldAlert: Icon,
   };
 });
 afterEach(cleanup);

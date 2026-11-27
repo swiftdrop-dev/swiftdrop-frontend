@@ -50,7 +50,7 @@ interface PublicTrackingResult {
 const PublicTracking: React.FC = () => {
   const [params] = useSearchParams();
 
-  const initialQuery = params.get("q")?.trim() ?? "";
+  const initialQuery = (params.get("q") || params.get("number") || "").trim();
 
   const [trackingNum, setTrackingNum] = useState(initialQuery);
   const [result, setResult] = useState<PublicTrackingResult | null>(null);

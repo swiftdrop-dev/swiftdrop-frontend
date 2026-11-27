@@ -36,6 +36,7 @@ import DispatcherParcels from '../../features/dispatcher/pages/DispatcherParcels
 
 // Admin Pricing, Users & Estimates
 import { AdminUsersPage, AdminPricingPage } from '../../features/admin';
+import SettingsPage from '../../features/settings/pages/SettingsPage';
 import FeeEstimateWidget from '../../features/customer/components/FeeEstimateWidget';
 
 import { ProtectedRoute } from '../../components/shared/SharedComponents';
@@ -70,6 +71,8 @@ export const AppRouter: React.FC = () => {
         <Route path="/customer/book" element={<ProtectedRoute allowedRoles={['customer']}><BookParcel /></ProtectedRoute>} />
         <Route path="/customer/parcels" element={<ProtectedRoute allowedRoles={['customer']}><MyParcels /></ProtectedRoute>} />
         <Route path="/customer/notifications" element={<ProtectedRoute allowedRoles={['customer']}><NotificationsPage /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute allowedRoles={['customer', 'merchant', 'courier', 'dispatcher', 'admin']}><NotificationsPage /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute allowedRoles={['customer', 'merchant', 'courier', 'dispatcher', 'admin']}><SettingsPage /></ProtectedRoute>} />
 
         {/* Merchant */}
         <Route path="/merchant" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantDashboard /></MerchantModuleBoundary></ProtectedRoute>} />

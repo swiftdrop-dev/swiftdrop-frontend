@@ -158,6 +158,12 @@ export interface UpdateMerchantProfilePayload {
   businessType?: BusinessType;
   webhookUrl?: string;
   webhookSecret?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  pickupStreet?: string;
+  pickupCity?: string;
+  pickupDistrict?: string;
 }
 
 export interface AddAddressPayload {
