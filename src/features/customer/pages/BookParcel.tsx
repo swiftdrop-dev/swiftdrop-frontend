@@ -219,7 +219,10 @@ const BookParcel: React.FC = () => {
         parcelSize: form.size.toUpperCase(),
         fragile: form.fragile,
         paymentMethod: form.paymentMethod.toUpperCase(),
-        totalFee: estimate.totalEstimatedFee,
+        senderName: user.name,
+        fromZoneCode: mapDistrictToZoneCode(form.pickupDistrict),
+        toZoneCode: mapDistrictToZoneCode(form.deliveryDistrict),
+        deliveryType: form.deliverySpeed,
       };
 
       const booked = await customerParcelApi.bookParcel(bookingReq);

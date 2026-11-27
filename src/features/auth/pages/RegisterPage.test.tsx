@@ -62,35 +62,22 @@ describe('RegisterPage Google OAuth & Regression Tests', () => {
     expect(screen.getByText(/or continue with/i)).toBeInTheDocument();
   });
 
-  it('initiates Google sign-up and handles success with customer redirect', async () => {
-    vi.mocked(authService.googleLogin).mockResolvedValueOnce({
-      token: 'jwt-new-google-cust',
-      id: 'cust-oauth-1',
-      email: 'newuser@google.com',
-      name: 'New Google User',
-      role: 'customer',
-    });
-
+  it('does not create a session when Google sign-up is not configured', async () => {
     renderRegisterPage();
 
-    const googleBtn = screen.getByRole('button', { name: /sign up with google/i });
-    fireEvent.click(googleBtn);
+    fireEvent.click(screen.getByRole('button', { name: /sign up with google/i }));
 
-    expect(authService.googleLogin).toHaveBeenCalledWith('demo_google_token');
-    expect(await screen.findByText('Customer Dashboard Screen')).toBeInTheDocument();
-    expect(localStorage.getItem('swiftdrop_token')).toBe('jwt-new-google-cust');
+    expect(await screen.findByText('Google Sign-In is not configured.')).toBeInTheDocument();
+    expect(authService.googleLogin).not.toHaveBeenCalled();
+    expect(localStorage.getItem('swiftdrop_token')).toBeNull();
   });
 
-  it('displays error message when Google sign-up fails', async () => {
-    const error = createAxiosError('Google OAuth token audience mismatch', 401);
-    vi.mocked(authService.googleLogin).mockRejectedValueOnce(error);
-
+  it('displays error message when Google sign-up is unavailable', async () => {
     renderRegisterPage();
 
-    const googleBtn = screen.getByRole('button', { name: /sign up with google/i });
-    fireEvent.click(googleBtn);
+    fireEvent.click(screen.getByRole('button', { name: /sign up with google/i }));
 
-    expect(await screen.findByText('Google OAuth token audience mismatch')).toBeInTheDocument();
+    expect(await screen.findByText('Google Sign-In is not configured.')).toBeInTheDocument();
     expect(screen.queryByText('Customer Dashboard Screen')).not.toBeInTheDocument();
   });
 

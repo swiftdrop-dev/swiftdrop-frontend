@@ -148,12 +148,10 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
           }
         });
       } catch {
-        // Fallback or demo invocation in offline/testing environments
-        onCredentialRef.current('demo_google_token');
+        onErrorRef.current?.('Google Sign-In is unavailable. Try again or use email and password.');
       }
     } else {
-      // In development / demo environment without Google Client ID configured
-      onCredentialRef.current('demo_google_token');
+      onErrorRef.current?.('Google Sign-In is not configured.');
     }
   };
 

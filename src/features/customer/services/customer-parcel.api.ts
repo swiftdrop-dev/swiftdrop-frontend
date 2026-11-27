@@ -11,6 +11,11 @@ export interface CreateParcelBookingRequest {
   fragile?: boolean;
   paymentMethod?: string;
   totalFee?: number;
+  senderName?: string;
+  senderPhone?: string;
+  fromZoneCode?: string;
+  toZoneCode?: string;
+  deliveryType?: string;
 }
 
 export interface ParcelBookingResponse {

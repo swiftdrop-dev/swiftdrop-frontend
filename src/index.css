@@ -1317,6 +1317,43 @@ h3 {
   transform: translateY(-1px);
 }
 
+.btn-outline {
+  background: transparent;
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.btn-outline:hover {
+  border-color: var(--border-accent);
+  color: var(--primary-dark);
+  background: var(--surface-muted, rgba(13, 148, 136, 0.06));
+}
+
+.settings-facts {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.settings-facts div {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-facts dt {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.settings-facts dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
 .btn-success {
   background: linear-gradient(135deg, #10b981, #059669);
   color: #fff;

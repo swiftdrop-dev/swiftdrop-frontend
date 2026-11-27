@@ -2,6 +2,7 @@ import { apiClient } from '../../../lib/api-client';
 import type {
   DispatchJob,
   DispatchJobSummary,
+  DispatchJobListItem,
   CourierCandidate,
   PageResponse,
   ManualAssignPayload,
@@ -18,6 +19,25 @@ export const dispatchApi = {
 
     const res = await apiClient.get<{ success: boolean; data: PageResponse<DispatchJobSummary> }>(
       `/dispatch/jobs/unassigned?${params.toString()}`
+    );
+    return res.data.data;
+  },
+
+  getJobsByStatus: async (status: string, page = 0, size = 100): Promise<PageResponse<DispatchJobListItem>> => {
+    const params = new URLSearchParams({
+      status,
+      page: page.toString(),
+      size: size.toString(),
+    });
+    const res = await apiClient.get<{ success: boolean; data: PageResponse<DispatchJobListItem> }>(
+      `/dispatch/jobs?${params.toString()}`
+    );
+    return res.data.data;
+  },
+
+  getActiveAssignments: async (): Promise<DispatchJobListItem[]> => {
+    const res = await apiClient.get<{ success: boolean; data: DispatchJobListItem[] }>(
+      '/dispatch/jobs/active-assignments'
     );
     return res.data.data;
   },

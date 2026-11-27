@@ -469,7 +469,7 @@ const NotificationsPage: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {item.trackingNumber && (
                       <Link
-                        to={`/track?number=${item.trackingNumber}`}
+                        to={`/track?q=${encodeURIComponent(item.trackingNumber)}`}
                         style={{
                           fontSize: 13,
                           fontWeight: 600,
