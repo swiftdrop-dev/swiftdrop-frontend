@@ -4,7 +4,6 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import RegisterPage from './RegisterPage';
 import { AuthProvider } from '../context/AuthContext';
 import { authService } from '../../../services/auth.service';
-import type { AxiosError } from 'axios';
 
 vi.mock('../../../services/auth.service', () => ({
   authService: {
@@ -15,21 +14,6 @@ vi.mock('../../../services/auth.service', () => ({
     getToken: vi.fn(),
   },
 }));
-
-function createAxiosError(message: string, status = 400): AxiosError {
-  return {
-    isAxiosError: true,
-    name: 'AxiosError',
-    message,
-    response: {
-      status,
-      statusText: status === 403 ? 'Forbidden' : 'Bad Request',
-      headers: {},
-      config: {} as any,
-      data: { message, status, error: 'Auth Error' },
-    },
-  } as AxiosError;
-}
 
 function renderRegisterPage(initialRoute = '/register') {
   return render(
