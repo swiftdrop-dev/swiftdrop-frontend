@@ -1,0 +1,85 @@
+import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach, vi } from "vitest";
+// Icon rendering is outside these behavior tests; avoid loading the full icon barrel per worker.
+vi.mock("lucide-react", () => {
+  const Icon = () => null;
+  return {
+    Circle: Icon,
+    Inbox: Icon,
+    CheckCircle: Icon,
+    Clock: Icon,
+    Loader: Icon,
+    TrendingUp: Icon,
+    TrendingDown: Icon,
+    X: Icon,
+    CheckCircle2: Icon,
+    AlertTriangle: Icon,
+    Info: Icon,
+    XCircle: Icon,
+    Package: Icon,
+    LayoutDashboard: Icon,
+    PlusCircle: Icon,
+    List: Icon,
+    FileText: Icon,
+    Truck: Icon,
+    MapPin: Icon,
+    CheckSquare: Icon,
+    BarChart2: Icon,
+    Users: Icon,
+    Settings: Icon,
+    LogOut: Icon,
+    Menu: Icon,
+    Bell: Icon,
+    ChevronDown: Icon,
+    DollarSign: Icon,
+    Calculator: Icon,
+    RefreshCw: Icon,
+    AlertCircle: Icon,
+    Download: Icon,
+    Star: Icon,
+    Search: Icon,
+    User: Icon,
+    Phone: Icon,
+    Weight: Icon,
+    Mail: Icon,
+    Lock: Icon,
+    Eye: Icon,
+    EyeOff: Icon,
+    ArrowRight: Icon,
+    ShoppingBag: Icon,
+    Store: Icon,
+    Bike: Icon,
+    SlidersHorizontal: Icon,
+    Briefcase: Icon,
+    Archive: Icon,
+    Boxes: Icon,
+    ChevronRight: Icon,
+    ChevronLeft: Icon,
+    CheckCheck: Icon,
+    Filter: Icon,
+    ExternalLink: Icon,
+    MessageSquare: Icon,
+    Webhook: Icon,
+    Copy: Icon,
+    RotateCw: Icon,
+    Trash2: Icon,
+    Play: Icon,
+    Check: Icon,
+    Key: Icon,
+    Globe: Icon,
+    Activity: Icon,
+    Code: Icon,
+    UserCheck: Icon,
+    Zap: Icon,
+    Navigation: Icon,
+    ShieldAlert: Icon,
+  };
+});
+afterEach(cleanup);
+HTMLDialogElement.prototype.showModal = function () {
+  this.setAttribute("open", "");
+};
+HTMLDialogElement.prototype.close = function () {
+  this.removeAttribute("open");
+};

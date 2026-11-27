@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500" fill="none">
+  <defs>
+    <linearGradient id="bg" x2="800" y2="500" gradientUnits="userSpaceOnUse"><stop stop-color="#d9f3f5"/><stop offset="1" stop-color="#e5edf8"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-20%" width="160%" height="160%"><feDropShadow dy="12" stdDeviation="14" flood-color="#173e57" flood-opacity=".15"/></filter>
+  </defs>
+  <path fill="url(#bg)" d="M0 0h800v500H0z"/>
+  <circle cx="727" cy="66" r="150" fill="#c1e8eb" opacity=".5"/>
+  <circle cx="63" cy="480" r="160" fill="#c9ddeb" opacity=".5"/>
+  <g filter="url(#shadow)" transform="rotate(-5 370 250)">
+    <rect x="176" y="46" width="391" height="414" rx="14" fill="white"/>
+    <rect x="176" y="46" width="391" height="9" rx="4" fill="#0d9488"/>
+    <g font-family="Arial, sans-serif">
+      <text x="205" y="96" fill="#10263f" font-size="22" font-weight="700">Swift<tspan fill="#0d9488">Drop</tspan></text>
+      <text x="205" y="127" fill="#52677c" font-size="11" letter-spacing="2">PROOF OF DELIVERY</text>
+      <path d="M205 145h332" stroke="#e2e8f0"/>
+      <text x="205" y="173" fill="#64748b" font-size="10">TRACKING NUMBER</text>
+      <text x="205" y="195" fill="#10263f" font-size="17" font-weight="700">SWF-2026-001234</text>
+      <rect x="205" y="214" width="130" height="28" rx="14" fill="#dcfce7"/>
+      <path d="m218 228 4 4 7-8" stroke="#15803d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="239" y="232" fill="#15803d" font-size="11" font-weight="700">DELIVERED</text>
+      <text x="205" y="271" fill="#64748b" font-size="10">DELIVERY JOURNEY</text>
+      <path d="M216 294h296" stroke="#0d9488" stroke-width="3"/>
+      <g fill="#0d9488"><circle cx="216" cy="294" r="7"/><circle cx="314" cy="294" r="7"/><circle cx="413" cy="294" r="7"/><circle cx="512" cy="294" r="7"/></g>
+      <g fill="#52677c" font-size="9"><text x="205" y="318">Booked</text><text x="293" y="318">Collected</text><text x="393" y="318">In transit</text><text x="492" y="318">Delivered</text></g>
+      <path d="M205 338h332" stroke="#e2e8f0"/>
+      <text x="205" y="363" fill="#64748b" font-size="10">RECIPIENT SIGNATURE</text>
+      <path d="M213 407c22-50 39-33 16-5-13 16-10-17 14-19 17-2-7 26 4 23 9-2 13-20 20-15s-5 18 8 12 17-13 20-6 19 0 29-4m-115 22 127-6" stroke="#173e57" stroke-width="2" stroke-linecap="round"/>
+      <text x="420" y="414" fill="#0d9488" font-size="10" font-weight="700">VERIFIED ✓</text>
+    </g>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="500" y="182" width="198" height="119" rx="16" fill="#10263f"/>
+    <circle cx="536" cy="220" r="17" fill="#0d9488"/>
+    <path d="m528 220 6 6 10-12" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <g font-family="Arial, sans-serif" fill="white"><text x="563" y="216" font-size="13" font-weight="700">Parcel received</text><text x="563" y="233" font-size="10" fill="#b5d5dd">Delivery confirmed</text><text x="521" y="276" font-size="11" fill="#b5d5dd">Photo · Signature · OTP</text></g>
+  </g>
+</svg>

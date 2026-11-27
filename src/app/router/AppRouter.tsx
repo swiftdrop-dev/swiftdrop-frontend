@@ -1,0 +1,112 @@
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from '../../features/auth/context/AuthContext';
+
+// Public
+import LandingPage from '../../components/shared/LandingPage';
+import PublicTracking from '../../features/tracking/pages/PublicTracking';
+
+// Auth
+import LoginPage from '../../features/auth/pages/LoginPage';
+import RegisterPage from '../../features/auth/pages/RegisterPage';
+
+// Customer
+import CustomerDashboard from '../../features/customer/pages/CustomerDashboard';
+import BookParcel from '../../features/customer/pages/BookParcel';
+import MyParcels from '../../features/customer/pages/MyParcels';
+import NotificationsPage from '../../features/notifications/pages/NotificationsPage';
+
+// Merchant
+import MerchantDashboard from '../../features/merchant/pages/MerchantDashboard';
+import BulkBooking from '../../features/merchant/pages/BulkBooking';
+import MerchantParcels from '../../features/merchant/pages/MerchantParcels';
+import { MerchantModuleBoundary, MerchantOnboarding, MerchantProfile, MerchantApiKeys, MerchantOrderCreate, MerchantOrders, MerchantOrderDetail, MerchantWebhooksPage } from '../../features/merchant';
+import AdminMerchantReviewPage from '../../features/merchant/pages/AdminMerchantReviewPage';
+
+// Courier
+import CourierDashboard from '../../features/courier/pages/CourierDashboard';
+import AssignedDeliveries from '../../features/courier/pages/AssignedDeliveries';
+import ProofOfDelivery from '../../features/courier/pages/ProofOfDelivery';
+
+// Dispatcher
+import DispatcherDashboard from '../../features/dispatcher/pages/DispatcherDashboard';
+import AssignCourier from '../../features/dispatcher/pages/AssignCourier';
+import Reports from '../../features/dispatcher/pages/Reports';
+import DispatcherParcels from '../../features/dispatcher/pages/DispatcherParcels';
+
+// Admin Pricing, Users & Estimates
+import { AdminUsersPage, AdminPricingPage } from '../../features/admin';
+import SettingsPage from '../../features/settings/pages/SettingsPage';
+import FeeEstimateWidget from '../../features/customer/components/FeeEstimateWidget';
+
+import { ProtectedRoute } from '../../components/shared/SharedComponents';
+
+const RootRedirect: React.FC = () => {
+  const { isAuthenticated, user } = useAuth();
+  if (!isAuthenticated) return <LandingPage />;
+  const redirects: Record<string, string> = {
+    customer: '/customer',
+    merchant: '/merchant',
+    courier: '/courier',
+    dispatcher: '/dispatcher',
+    admin: '/admin/users',
+  };
+  return <Navigate to={redirects[user!.role] ?? '/login'} replace />;
+};
+
+export const AppRouter: React.FC = () => {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<RootRedirect />} />
+        <Route path="/track" element={<PublicTracking />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/pricing" element={<Navigate to="/admin/pricing" replace />} />
+        <Route path="/estimate" element={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'var(--bg-base)' }}><FeeEstimateWidget /></div>} />
+
+        {/* Customer */}
+        <Route path="/customer" element={<ProtectedRoute allowedRoles={['customer']}><CustomerDashboard /></ProtectedRoute>} />
+        <Route path="/customer/book" element={<ProtectedRoute allowedRoles={['customer']}><BookParcel /></ProtectedRoute>} />
+        <Route path="/customer/parcels" element={<ProtectedRoute allowedRoles={['customer']}><MyParcels /></ProtectedRoute>} />
+        <Route path="/customer/notifications" element={<ProtectedRoute allowedRoles={['customer']}><NotificationsPage /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute allowedRoles={['customer', 'merchant', 'courier', 'dispatcher', 'admin']}><NotificationsPage /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute allowedRoles={['customer', 'merchant', 'courier', 'dispatcher', 'admin']}><SettingsPage /></ProtectedRoute>} />
+
+        {/* Merchant */}
+        <Route path="/merchant" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantDashboard /></MerchantModuleBoundary></ProtectedRoute>} />
+        <Route path="/merchant/book" element={<ProtectedRoute allowedRoles={['merchant']}><Navigate to="/merchant/orders/new" replace /></ProtectedRoute>} />
+        <Route path="/merchant/onboarding" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantOnboarding /></MerchantModuleBoundary></ProtectedRoute>} />
+        <Route path="/merchant/profile" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantProfile /></MerchantModuleBoundary></ProtectedRoute>} />
+        <Route path="/merchant/api-keys" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantApiKeys /></MerchantModuleBoundary></ProtectedRoute>} />
+        <Route path="/merchant/webhooks" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantWebhooksPage /></MerchantModuleBoundary></ProtectedRoute>} />
+        <Route path="/merchant/orders/new" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantOrderCreate /></MerchantModuleBoundary></ProtectedRoute>} />
+        <Route path="/merchant/orders" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantOrders /></MerchantModuleBoundary></ProtectedRoute>} />
+        <Route path="/merchant/orders/:id" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantModuleBoundary><MerchantOrderDetail /></MerchantModuleBoundary></ProtectedRoute>} />
+        <Route path="/merchant/bulk" element={<ProtectedRoute allowedRoles={['merchant']}><BulkBooking /></ProtectedRoute>} />
+        <Route path="/merchant/parcels" element={<ProtectedRoute allowedRoles={['merchant']}><MerchantParcels /></ProtectedRoute>} />
+
+        {/* Courier */}
+        <Route path="/courier" element={<ProtectedRoute allowedRoles={['courier']}><CourierDashboard /></ProtectedRoute>} />
+        <Route path="/courier/deliveries" element={<ProtectedRoute allowedRoles={['courier']}><AssignedDeliveries /></ProtectedRoute>} />
+        <Route path="/courier/proof" element={<ProtectedRoute allowedRoles={['courier']}><ProofOfDelivery /></ProtectedRoute>} />
+
+        {/* Dispatcher */}
+        <Route path="/dispatcher" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><DispatcherDashboard /></ProtectedRoute>} />
+        <Route path="/dispatcher/parcels" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><DispatcherParcels /></ProtectedRoute>} />
+        <Route path="/dispatcher/assign" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><AssignCourier /></ProtectedRoute>} />
+        <Route path="/dispatcher/reports" element={<ProtectedRoute allowedRoles={['dispatcher', 'admin']}><Reports /></ProtectedRoute>} />
+
+        {/* Admin Compliance, Pricing, Users & Verification */}
+        <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['admin']}><AdminUsersPage /></ProtectedRoute>} />
+        <Route path="/admin/merchants" element={<ProtectedRoute allowedRoles={['admin']}><AdminMerchantReviewPage /></ProtectedRoute>} />
+        <Route path="/admin/merchants/pending" element={<ProtectedRoute allowedRoles={['admin']}><AdminMerchantReviewPage /></ProtectedRoute>} />
+        <Route path="/admin/pricing" element={<ProtectedRoute allowedRoles={['admin']}><AdminPricingPage /></ProtectedRoute>} />
+
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+};

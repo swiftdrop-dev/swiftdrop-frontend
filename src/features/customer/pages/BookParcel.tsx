@@ -1,0 +1,1521 @@
+import React, { useRef, useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Package,
+  User,
+  Phone,
+  Weight,
+  Info,
+  ChevronRight,
+  ChevronLeft,
+  CheckCircle,
+  Mail,
+  Briefcase,
+  Archive,
+  Boxes,
+  RefreshCw,
+  AlertCircle,
+} from "lucide-react";
+
+import DashboardLayout from "../../../components/layout/DashboardLayout";
+import { useToast } from "../../../components/shared/SharedComponents";
+import { useAuth } from "../../auth/context/AuthContext";
+import { customerParcelApi } from "../services/customer-parcel.api";
+import {
+  pricingService,
+  mapDistrictToZoneCode,
+  type FeeEstimateResponse,
+} from "../../../services/pricing.service";
+
+import type {
+  ParcelSize,
+} from "../../../types/global.types";
+
+import "../customer.css";
+
+const SIZES: {
+  value: ParcelSize;
+  label: string;
+  desc: string;
+  icon: React.ReactNode;
+}[] = [
+  {
+    value: "xs",
+    label: "Extra Small",
+    desc: "Under 0.5 kg / Envelope",
+    icon: <Mail size={20} strokeWidth={1.6} />,
+  },
+  {
+    value: "sm",
+    label: "Small",
+    desc: "0.5–2 kg / Shoebox",
+    icon: <Package size={20} strokeWidth={1.6} />,
+  },
+  {
+    value: "md",
+    label: "Medium",
+    desc: "2–5 kg / Laptop bag",
+    icon: <Briefcase size={20} strokeWidth={1.6} />,
+  },
+  {
+    value: "lg",
+    label: "Large",
+    desc: "5–15 kg / Moving box",
+    icon: <Archive size={20} strokeWidth={1.6} />,
+  },
+  {
+    value: "xl",
+    label: "Extra Large",
+    desc: "15 kg+ / Bulk cargo",
+    icon: <Boxes size={20} strokeWidth={1.6} />,
+  },
+];
+
+const DISTRICTS = [
+  "Colombo",
+  "Gampaha",
+  "Kalutara",
+  "Kandy",
+  "Matale",
+  "Nuwara Eliya",
+  "Galle",
+  "Matara",
+  "Hambantota",
+  "Jaffna",
+  "Kilinochchi",
+  "Mannar",
+  "Vavuniya",
+  "Mullaitivu",
+  "Batticaloa",
+  "Ampara",
+  "Trincomalee",
+  "Kurunegala",
+  "Puttalam",
+  "Anuradhapura",
+  "Polonnaruwa",
+  "Badulla",
+  "Monaragala",
+  "Ratnapura",
+  "Kegalle",
+];
+
+const BookParcel: React.FC = () => {
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+  const { user } = useAuth();
+
+  const [step, setStep] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const submittingRef = useRef(false);
+
+  const [form, setForm] = useState({
+    recipientName: "",
+    recipientPhone: "",
+    pickupStreet: "",
+    pickupCity: "Colombo",
+    pickupDistrict: "Colombo",
+    deliveryStreet: "",
+    deliveryCity: "",
+    deliveryDistrict: "Colombo",
+    description: "",
+    weight: 1,
+    size: "sm" as ParcelSize,
+    declaredValue: "",
+    fragile: false,
+    specialInstructions: "",
+    paymentMethod: "cod" as "cod" | "online",
+    deliverySpeed: "STANDARD" as "STANDARD" | "EXPRESS" | "BULK",
+  });
+
+  const [estimate, setEstimate] = useState<FeeEstimateResponse | null>(null);
+  const [estimateLoading, setEstimateLoading] = useState(false);
+  const [estimateError, setEstimateError] = useState<string | null>(null);
+
+  function update<K extends keyof typeof form>(
+    key: K,
+    value: (typeof form)[K],
+  ) {
+    setForm((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  }
+
+  const calculateFee = useCallback(async () => {
+    const weightVal = Number(form.weight);
+    if (!weightVal || weightVal <= 0) {
+      setEstimate(null);
+      return;
+    }
+
+    setEstimateLoading(true);
+    setEstimateError(null);
+
+    try {
+      const fromZoneCode = mapDistrictToZoneCode(form.pickupDistrict);
+      const toZoneCode = mapDistrictToZoneCode(form.deliveryDistrict);
+
+      const res = await pricingService.estimateFee({
+        fromZoneCode,
+        toZoneCode,
+        weightKg: weightVal,
+        deliveryType: form.deliverySpeed,
+      });
+
+      setEstimate(res);
+    } catch (err: any) {
+      setEstimateError(err.message || "Failed to calculate delivery fee");
+      setEstimate(null);
+    } finally {
+      setEstimateLoading(false);
+    }
+  }, [form.pickupDistrict, form.deliveryDistrict, form.weight, form.deliverySpeed]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void calculateFee();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [calculateFee]);
+
+  const handleSubmit = async () => {
+    if (submittingRef.current) return;
+
+    if (!user) {
+      setError("Please log in before booking a parcel.");
+      return;
+    }
+
+    if (!estimate || estimateLoading) {
+      setError("Please ensure a valid shipping fee estimate is calculated before confirming.");
+      return;
+    }
+
+    submittingRef.current = true;
+    setSubmitting(true);
+    setError("");
+
+    try {
+      const pickupAddress = [form.pickupStreet, form.pickupCity, form.pickupDistrict]
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .join(", ");
+
+      const recipientAddress = [form.deliveryStreet, form.deliveryCity, form.deliveryDistrict]
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .join(", ");
+
+      const bookingReq = {
+        recipientName: form.recipientName.trim(),
+        recipientPhone: form.recipientPhone.replace(/[-\s]/g, "").trim(),
+        recipientAddress,
+        pickupAddress,
+        description: form.description.trim() || undefined,
+        weightKg: Number(form.weight) || 1.0,
+        parcelSize: form.size.toUpperCase(),
+        fragile: form.fragile,
+        paymentMethod: form.paymentMethod.toUpperCase(),
+        senderName: user.name,
+        fromZoneCode: mapDistrictToZoneCode(form.pickupDistrict),
+        toZoneCode: mapDistrictToZoneCode(form.deliveryDistrict),
+        deliveryType: form.deliverySpeed,
+      };
+
+      const booked = await customerParcelApi.bookParcel(bookingReq);
+
+      showToast(
+        `Parcel booked successfully! Tracking: ${booked.trackingNumber}`,
+        "success",
+      );
+
+      navigate(
+        user.role === "merchant"
+          ? "/merchant/parcels"
+          : "/customer/parcels",
+        {
+          state: {
+            bookedTracking: booked.trackingNumber,
+          },
+        },
+      );
+    } catch (err: any) {
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Your booking could not be saved. Please try again.",
+      );
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  };
+
+  const steps = [
+    { id: 1, label: "Addresses" },
+    { id: 2, label: "Package" },
+    { id: 3, label: "Review" },
+  ];
+
+  return (
+    <DashboardLayout>
+      <div className="page-header">
+        <h1 className="page-title">Book a Parcel</h1>
+        <p className="page-subtitle">
+          Fill in the details to create a new delivery booking
+        </p>
+      </div>
+
+      {/* Step indicator */}
+      <div
+        className="step-indicator"
+        style={{ maxWidth: 480, marginBottom: 28 }}
+      >
+        {steps.map((item, index) => (
+          <React.Fragment key={item.id}>
+            <div className="step-item">
+              <div
+                className={`step-circle ${
+                  step > item.id
+                    ? "done"
+                    : step === item.id
+                      ? "active"
+                      : ""
+                }`}
+              >
+                {step > item.id ? (
+                  <CheckCircle size={14} />
+                ) : (
+                  item.id
+                )}
+              </div>
+
+              <span
+                className={`step-label ${
+                  step > item.id
+                    ? "done"
+                    : step === item.id
+                      ? "active"
+                      : ""
+                }`}
+                aria-current={
+                  step === item.id ? "step" : undefined
+                }
+              >
+                {item.label}
+              </span>
+            </div>
+
+            {index < steps.length - 1 && (
+              <div
+                className={`step-line ${
+                  step > item.id ? "done" : ""
+                }`}
+              />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div className="customer-booking-grid">
+        <div className="card">
+          <form
+            className="card-body customer-booking-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+
+              if (step < 3) {
+                setError("");
+                setStep((current) => current + 1);
+              } else {
+                void handleSubmit();
+              }
+            }}
+          >
+            {error && (
+              <p role="alert" className="customer-error">
+                {error}
+              </p>
+            )}
+
+            {/* Step 1: Addresses */}
+            {step === 1 && (
+              <div className="animate-fade-in">
+                <h3
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: "var(--text-primary)",
+                    marginBottom: 20,
+                  }}
+                >
+                  Pickup & Delivery Addresses
+                </h3>
+
+                <div
+                  style={{
+                    borderLeft: "3px solid var(--primary)",
+                    paddingLeft: 16,
+                    marginBottom: 24,
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "var(--primary-light)",
+                      marginBottom: 12,
+                    }}
+                  >
+                    Pickup Location
+                  </p>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12,
+                    }}
+                  >
+                    <div className="form-group">
+                      <label
+                        className="form-label"
+                        htmlFor="pickupStreet"
+                      >
+                        Street Address *
+                      </label>
+
+                      <input
+                        id="pickupStreet"
+                        className="form-input"
+                        placeholder="12 Kandy Road"
+                        value={form.pickupStreet}
+                        onChange={(event) =>
+                          update("pickupStreet", event.target.value)
+                        }
+                        required
+                        pattern=".*\S.*"
+                      />
+                    </div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 12,
+                      }}
+                    >
+                      <div className="form-group">
+                        <label
+                          className="form-label"
+                          htmlFor="pickupCity"
+                        >
+                          City *
+                        </label>
+
+                        <input
+                          id="pickupCity"
+                          className="form-input"
+                          placeholder="Colombo"
+                          value={form.pickupCity}
+                          onChange={(event) =>
+                            update("pickupCity", event.target.value)
+                          }
+                          required
+                          pattern=".*\S.*"
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label
+                          className="form-label"
+                          htmlFor="pickupDistrict"
+                        >
+                          District *
+                        </label>
+
+                        <select
+                          id="pickupDistrict"
+                          className="form-input"
+                          value={form.pickupDistrict}
+                          onChange={(event) =>
+                            update(
+                              "pickupDistrict",
+                              event.target.value,
+                            )
+                          }
+                        >
+                          {DISTRICTS.map((district) => (
+                            <option key={district} value={district}>
+                              {district}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    borderLeft: "3px solid var(--success)",
+                    paddingLeft: 16,
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "var(--success)",
+                      marginBottom: 12,
+                    }}
+                  >
+                    Delivery Details
+                  </p>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 12,
+                      }}
+                    >
+                      <div className="form-group">
+                        <label
+                          className="form-label"
+                          htmlFor="recipientName"
+                        >
+                          Recipient Name *
+                        </label>
+
+                        <div className="form-input-icon">
+                          <User className="icon" size={16} />
+
+                          <input
+                            id="recipientName"
+                            className="form-input"
+                            placeholder="Full name"
+                            value={form.recipientName}
+                            onChange={(event) =>
+                              update(
+                                "recipientName",
+                                event.target.value,
+                              )
+                            }
+                            required
+                            pattern=".*\S.*"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-group">
+                        <label
+                          className="form-label"
+                          htmlFor="recipientPhone"
+                        >
+                          Recipient Phone *
+                        </label>
+
+                        <div className="form-input-icon">
+                          <Phone className="icon" size={16} />
+
+                          <input
+                            id="recipientPhone"
+                            type="tel"
+                            className="form-input"
+                            placeholder="0771234567 or 077-1234567"
+                            pattern="(?:0\d{2}[-\s]?\d{3}[-\s]?\d{4}|0\d{9}|\+94\d{2}[-\s]?\d{3}[-\s]?\d{4}|\+94\d{9})"
+                            title="Enter 10 digits (e.g. 0771234567 or 077-1234567), or +94 followed by 9 digits"
+                            value={form.recipientPhone}
+                            onChange={(event) =>
+                              update(
+                                "recipientPhone",
+                                event.target.value,
+                              )
+                            }
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label
+                        className="form-label"
+                        htmlFor="deliveryStreet"
+                      >
+                        Delivery Street Address *
+                      </label>
+
+                      <input
+                        id="deliveryStreet"
+                        className="form-input"
+                        placeholder="45 Galle Road"
+                        value={form.deliveryStreet}
+                        onChange={(event) =>
+                          update(
+                            "deliveryStreet",
+                            event.target.value,
+                          )
+                        }
+                        required
+                        pattern=".*\S.*"
+                      />
+                    </div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 12,
+                      }}
+                    >
+                      <div className="form-group">
+                        <label
+                          className="form-label"
+                          htmlFor="deliveryCity"
+                        >
+                          City *
+                        </label>
+
+                        <input
+                          id="deliveryCity"
+                          className="form-input"
+                          placeholder="Kandy"
+                          value={form.deliveryCity}
+                          onChange={(event) =>
+                            update(
+                              "deliveryCity",
+                              event.target.value,
+                            )
+                          }
+                          required
+                          pattern=".*\S.*"
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label
+                          className="form-label"
+                          htmlFor="deliveryDistrict"
+                        >
+                          District *
+                        </label>
+
+                        <select
+                          id="deliveryDistrict"
+                          className="form-input"
+                          value={form.deliveryDistrict}
+                          onChange={(event) =>
+                            update(
+                              "deliveryDistrict",
+                              event.target.value,
+                            )
+                          }
+                        >
+                          {DISTRICTS.map((district) => (
+                            <option key={district} value={district}>
+                              {district}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Package details */}
+            {step === 2 && (
+              <div className="animate-fade-in">
+                <h3
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: "var(--text-primary)",
+                    marginBottom: 20,
+                  }}
+                >
+                  Package Details
+                </h3>
+
+                <div
+                  className="form-group"
+                  style={{ marginBottom: 20 }}
+                >
+                  <label
+                    className="form-label"
+                    htmlFor="description"
+                  >
+                    Package Description *
+                  </label>
+
+                  <div className="form-input-icon">
+                    <Package className="icon" size={16} />
+
+                    <input
+                      id="description"
+                      className="form-input"
+                      placeholder="e.g. Electronics – Laptop"
+                      value={form.description}
+                      onChange={(event) =>
+                        update("description", event.target.value)
+                      }
+                      required
+                      pattern=".*\S.*"
+                    />
+                  </div>
+                </div>
+
+                <div
+                  className="form-group"
+                  style={{ marginBottom: 20 }}
+                >
+                  <p className="form-label" id="packageSizeLabel">
+                    Package Size *
+                  </p>
+
+                  <div
+                    className="customer-size-grid"
+                    role="group"
+                    aria-labelledby="packageSizeLabel"
+                  >
+                    {SIZES.map((size) => (
+                      <button
+                        key={size.value}
+                        type="button"
+                        aria-pressed={form.size === size.value}
+                        onClick={() => update("size", size.value)}
+                        style={{
+                          padding: "12px 8px",
+                          borderRadius: 14,
+                          textAlign: "center",
+                          border: `2px solid ${
+                            form.size === size.value
+                              ? "var(--primary)"
+                              : "var(--border-strong)"
+                          }`,
+                          background:
+                            form.size === size.value
+                              ? "var(--primary-tint)"
+                              : "var(--bg-overlay)",
+                          cursor: "pointer",
+                          transition: "all 200ms",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "center",
+                            marginBottom: 6,
+                            color: "var(--text-primary)",
+                          }}
+                        >
+                          {size.icon}
+                        </div>
+
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color:
+                              form.size === size.value
+                                ? "var(--primary-light)"
+                                : "var(--text-secondary)",
+                            marginTop: 6,
+                          }}
+                        >
+                          {size.label}
+                        </div>
+
+                        <div
+                          style={{
+                            fontSize: 10,
+                            color: "var(--text-muted)",
+                            marginTop: 2,
+                          }}
+                        >
+                          {size.desc}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 16,
+                    marginBottom: 16,
+                  }}
+                >
+                  <div className="form-group">
+                    <label
+                      className="form-label"
+                      htmlFor="weight"
+                    >
+                      Weight (kg) *
+                    </label>
+
+                    <div className="form-input-icon">
+                      <Weight className="icon" size={16} />
+
+                      <input
+                        id="weight"
+                        type="number"
+                        min={0.1}
+                        max={1000}
+                        step={0.1}
+                        className="form-input"
+                        value={form.weight}
+                        onChange={(event) =>
+                          update(
+                            "weight",
+                            event.target.value === ""
+                              ? 0
+                              : Number(event.target.value),
+                          )
+                        }
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label
+                      className="form-label"
+                      htmlFor="declaredValue"
+                    >
+                      Declared Value (Rs.)
+                    </label>
+
+                    <input
+                      id="declaredValue"
+                      type="number"
+                      min={0}
+                      max={10000000}
+                      step="any"
+                      className="form-input"
+                      placeholder="Optional"
+                      value={form.declaredValue}
+                      onChange={(event) =>
+                        update(
+                          "declaredValue",
+                          event.target.value,
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 16,
+                    marginBottom: 16,
+                  }}
+                >
+                  <div className="form-group">
+                    <label
+                      className="form-label"
+                      htmlFor="paymentMethod"
+                    >
+                      Payment Method
+                    </label>
+
+                    <select
+                      id="paymentMethod"
+                      className="form-input"
+                      value={form.paymentMethod}
+                      onChange={(event) =>
+                        update(
+                          "paymentMethod",
+                          event.target.value as "cod" | "online",
+                        )
+                      }
+                    >
+                      <option value="cod">Cash on Delivery</option>
+                      <option value="online">
+                        Online Payment (Demo)
+                      </option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label
+                      className="form-label"
+                      htmlFor="fragile"
+                    >
+                      Fragile Package?
+                    </label>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        marginTop: 8,
+                      }}
+                    >
+                      <label className="toggle-switch">
+                        <input
+                          id="fragile"
+                          type="checkbox"
+                          checked={form.fragile}
+                          onChange={(event) =>
+                            update(
+                              "fragile",
+                              event.target.checked,
+                            )
+                          }
+                        />
+                        <span className="toggle-track" />
+                      </label>
+
+                      <span
+                        style={{
+                          fontSize: 14,
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        {form.fragile
+                          ? "Requires careful handling"
+                          : "Standard handling"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label className="form-label" htmlFor="deliverySpeed">
+                    Delivery Service Level *
+                  </label>
+                  <select
+                    id="deliverySpeed"
+                    className="form-input"
+                    value={form.deliverySpeed}
+                    onChange={(event) =>
+                      update(
+                        "deliverySpeed",
+                        event.target.value as "STANDARD" | "EXPRESS" | "BULK",
+                      )
+                    }
+                  >
+                    <option value="STANDARD">Standard Delivery (1–2 Days)</option>
+                    <option value="EXPRESS">Express Priority (Next Day · 1.5x Rate)</option>
+                    <option value="BULK">Heavy Cargo & Bulk (&gt;10kg · 15% Weight Discount)</option>
+                  </select>
+                  <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+                    Rates and delivery strategy are calculated dynamically via backend Strategy Pattern.
+                  </p>
+                </div>
+
+                <div className="form-group">
+                  <label
+                    className="form-label"
+                    htmlFor="specialInstructions"
+                  >
+                    Special Instructions
+                  </label>
+
+                  <textarea
+                    id="specialInstructions"
+                    className="form-input"
+                    placeholder="e.g. Call before delivery, leave at gate..."
+                    value={form.specialInstructions}
+                    onChange={(event) =>
+                      update(
+                        "specialInstructions",
+                        event.target.value,
+                      )
+                    }
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Review */}
+            {step === 3 && (
+              <div className="animate-fade-in">
+                <h3
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: "var(--text-primary)",
+                    marginBottom: 20,
+                  }}
+                >
+                  Review & Confirm
+                </h3>
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 16,
+                  }}
+                >
+                  <div
+                    style={{
+                      background: "var(--bg-overlay)",
+                      borderRadius: 14,
+                      padding: 16,
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: "var(--text-muted)",
+                        marginBottom: 12,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                      }}
+                    >
+                      Addresses
+                    </p>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 16,
+                        fontSize: 13,
+                      }}
+                    >
+                      <div>
+                        <p
+                          style={{
+                            color: "var(--text-muted)",
+                            fontSize: 11,
+                            marginBottom: 4,
+                          }}
+                        >
+                          PICKUP FROM
+                        </p>
+
+                        <p
+                          style={{
+                            color: "var(--text-primary)",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {form.pickupStreet}
+                        </p>
+
+                        <p
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          {form.pickupCity}, {form.pickupDistrict}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p
+                          style={{
+                            color: "var(--text-muted)",
+                            fontSize: 11,
+                            marginBottom: 4,
+                          }}
+                        >
+                          DELIVER TO
+                        </p>
+
+                        <p
+                          style={{
+                            color: "var(--text-primary)",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {form.recipientName}
+                        </p>
+
+                        <p
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          {form.deliveryStreet}, {form.deliveryCity}
+                        </p>
+
+                        <p
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          {form.deliveryDistrict}
+                        </p>
+
+                        <p
+                          style={{
+                            color: "var(--text-muted)",
+                            marginTop: 4,
+                          }}
+                        >
+                          {form.recipientPhone}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: "var(--bg-overlay)",
+                      borderRadius: 14,
+                      padding: 16,
+                      fontSize: 13,
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontWeight: 700,
+                        color: "var(--text-muted)",
+                        marginBottom: 10,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        fontSize: 11,
+                      }}
+                    >
+                      Package
+                    </p>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr 1fr",
+                        gap: 12,
+                      }}
+                    >
+                      <div>
+                        <p
+                          style={{
+                            color: "var(--text-muted)",
+                            marginBottom: 2,
+                          }}
+                        >
+                          Description
+                        </p>
+
+                        <p
+                          style={{
+                            color: "var(--text-primary)",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {form.description}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p
+                          style={{
+                            color: "var(--text-muted)",
+                            marginBottom: 2,
+                          }}
+                        >
+                          Size / Weight
+                        </p>
+
+                        <p
+                          style={{
+                            color: "var(--text-primary)",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {form.size.toUpperCase()} /{" "}
+                          {form.weight}kg
+                        </p>
+                      </div>
+
+                      <div>
+                        <p
+                          style={{
+                            color: "var(--text-muted)",
+                            marginBottom: 2,
+                          }}
+                        >
+                          Payment
+                        </p>
+
+                        <p
+                          style={{
+                            color: "var(--text-primary)",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {form.paymentMethod === "cod"
+                            ? "Cash on Delivery"
+                            : "Online (Demo)"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {form.declaredValue && (
+                      <p
+                        style={{
+                          marginTop: 12,
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        Declared value: Rs.{" "}
+                        {Number(
+                          form.declaredValue,
+                        ).toLocaleString()}
+                      </p>
+                    )}
+
+                    {form.fragile && (
+                      <p
+                        style={{
+                          marginTop: 10,
+                          color: "var(--warning)",
+                          fontSize: 12,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <Info size={12} />
+                        Fragile — handled with care (+Rs. 75)
+                      </p>
+                    )}
+
+                    {form.specialInstructions.trim() && (
+                      <p
+                        style={{
+                          marginTop: 12,
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        Instructions: {form.specialInstructions}
+                      </p>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
+                      background: "var(--bg-overlay)",
+                      borderRadius: 14,
+                      padding: 16,
+                      fontSize: 13,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <p
+                        style={{
+                          fontWeight: 700,
+                          color: "var(--text-muted)",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          fontSize: 11,
+                          margin: 0,
+                        }}
+                      >
+                        Pricing & Service Strategy
+                      </p>
+                      {estimate && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "var(--primary-dark)",
+                            background: "var(--primary-tint)",
+                            padding: "3px 8px",
+                            borderRadius: 6,
+                          }}
+                        >
+                          {estimate.strategyApplied}
+                        </span>
+                      )}
+                    </div>
+
+                    {estimateLoading ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-secondary)", padding: "10px 0" }}>
+                        <RefreshCw size={14} className="animate-spin" />
+                        <span>Calculating dynamic delivery fee...</span>
+                      </div>
+                    ) : estimateError ? (
+                      <div
+                        style={{
+                          padding: "10px 12px",
+                          borderRadius: 8,
+                          background: "var(--danger-bg)",
+                          border: "1px solid var(--danger-border)",
+                          color: "var(--danger)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 8,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <AlertCircle size={14} />
+                          <span>{estimateError}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => void calculateFee()}
+                          style={{ fontSize: 11, padding: "2px 8px" }}
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    ) : estimate ? (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                        <div>
+                          <p style={{ color: "var(--text-muted)", marginBottom: 2 }}>Base Fee</p>
+                          <p style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                            Rs. {estimate.baseFee.toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p style={{ color: "var(--text-muted)", marginBottom: 2 }}>Per-Kg Rate ({form.weight} kg)</p>
+                          <p style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                            Rs. {(estimate.perKgFee * Number(form.weight)).toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p style={{ color: "var(--text-muted)", marginBottom: 2 }}>Total Delivery Fee</p>
+                          <p style={{ color: "var(--success)", fontWeight: 700, fontSize: 16 }}>
+                            Rs. {estimate.totalEstimatedFee.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p style={{ color: "var(--warning)", margin: 0 }}>
+                        Fee calculation pending. Please verify package details.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Navigation buttons */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: 28,
+                gap: 12,
+              }}
+            >
+              {step > 1 ? (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={submitting}
+                  onClick={() => {
+                    setError("");
+                    setStep((current) => current - 1);
+                  }}
+                >
+                  <ChevronLeft size={16} />
+                  Back
+                </button>
+              ) : (
+                <div />
+              )}
+
+              {step < 3 ? (
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                >
+                  Continue
+                  <ChevronRight size={16} />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="btn btn-success"
+                  disabled={submitting || estimateLoading || !estimate}
+                >
+                  {submitting ? (
+                    <>
+                      <div
+                        className="spinner"
+                        style={{
+                          width: 16,
+                          height: 16,
+                          borderWidth: 2,
+                        }}
+                      />
+                      Booking…
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle size={16} />
+                      Confirm Booking
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+
+        {/* Fee estimate sidebar */}
+        <div className="customer-fee-sidebar">
+          <div className="fee-box">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <p
+                style={{
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: "var(--text-primary)",
+                  margin: 0,
+                }}
+              >
+                Fee Estimate
+              </p>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: "var(--primary-dark)",
+                  background: "var(--primary-tint)",
+                  padding: "2px 6px",
+                  borderRadius: 6,
+                }}
+              >
+                Strategy Pattern
+              </span>
+            </div>
+
+            {estimateLoading && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "16px 0", color: "var(--text-secondary)", fontSize: 13 }}>
+                <RefreshCw size={14} className="animate-spin" />
+                <span>Calculating dynamic rate...</span>
+              </div>
+            )}
+
+            {estimateError && !estimateLoading && (
+              <div style={{ marginBottom: 16 }}>
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    background: "var(--danger-bg)",
+                    border: "1px solid var(--danger-border)",
+                    color: "var(--danger)",
+                    fontSize: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginBottom: 8,
+                  }}
+                >
+                  <AlertCircle size={14} />
+                  <span>{estimateError}</span>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => void calculateFee()}
+                  style={{ width: "100%", fontSize: 12 }}
+                >
+                  Retry Calculation
+                </button>
+              </div>
+            )}
+
+            {estimate && !estimateLoading && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--text-secondary)" }}>
+                  <span>Base Rate</span>
+                  <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                    Rs. {estimate.baseFee.toFixed(2)}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--text-secondary)" }}>
+                  <span>Per-kg Rate ({form.weight} kg)</span>
+                  <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                    Rs. {(estimate.perKgFee * Number(form.weight)).toFixed(2)}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--text-secondary)" }}>
+                  <span>Strategy Applied</span>
+                  <span style={{ fontWeight: 600, color: "var(--primary-dark)", fontSize: 11 }}>
+                    {estimate.strategyApplied}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    borderTop: "1px solid var(--border)",
+                    paddingTop: 10,
+                    marginTop: 4,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
+                  }}
+                >
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>Total Fee</span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 18,
+                      fontWeight: 800,
+                      color: "var(--success)",
+                    }}
+                  >
+                    Rs. {estimate.totalEstimatedFee.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {!estimate && !estimateLoading && !estimateError && (
+              <div className="fee-row-total">
+                <span>Total Fee</span>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#d97706",
+                    background: "#fef3c7",
+                    padding: "4px 8px",
+                    borderRadius: 6,
+                  }}
+                >
+                  Pending Calculation
+                </span>
+              </div>
+            )}
+
+            <div
+              style={{
+                marginTop: 16,
+                padding: "10px 14px",
+                background: "var(--success-bg)",
+                border: "1px solid var(--success-border)",
+                borderRadius: 10,
+                fontSize: 13,
+                color: "var(--success)",
+                fontWeight: 500,
+              }}
+            >
+              Est. delivery in <strong>{estimate?.estimatedDeliveryDays ? `${estimate.estimatedDeliveryDays} business days` : "1–3 days"}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+};
+
+export default BookParcel;
